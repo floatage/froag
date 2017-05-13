@@ -1,0 +1,1 @@
+scrapy crawl eastday --logfile log.txt -s JOBDIR=crawls/eastday-1
