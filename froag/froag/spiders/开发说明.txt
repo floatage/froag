@@ -303,8 +303,166 @@ Scrapy：
 		最后使用lsnrctl start重启监听器
 
 		数据库设计说明：
+		简单起见使用CONNECT和RESOURCE两个系统角色
 
+		需存取数据的地方：
+		1. 数据收集时需存储url之间的关系，本页面的推荐url，还有带粗标签的标准文章数据
+		2. 分类时需取出并修改文章数据表中的数据，并且需要向标签表中插入数据
+		3. 优化分类时需要读取并修改文章数据表、标签表中的数据
+		4. 推荐时需要用到url关系表，相似url表，文章数据表，用户信息表
+
+		1、2步可根据效率合并
+
+		可分5种用户：
+		数据库管理员：使用已存在的system  x1
+		数据所有者：具有CONNECT和RESOURCE两个角色  x1 
+		标签优化操作员：具有CONNECT和文章数据表、标签表的所有对象权限  x1
+		推荐系统用户：具有CONNECT和url关系表，相似url表，文章数据表，用户信息表的所有对象权限  x1
+		数据采集用户：具有CONNECT和url关系表，相似url表，文章数据表，标签表的所有对象权限  x3
+
+		数据采集分类所涉及的表结构：
+
+		文章数据表：
+		'''CREATE TABLE IF NOT EXISTS MsgTable(mId INTEGER PRIMARY KEY AUTOINCREMENT, \
+                        mSource text NOT NULL UNIQUE, \
+                        mTitle text NOT NULL, \
+                        mIntro text NOT NULL, \
+                        mPic text NOT NULL, \
+                        mTags text NOT NULL, \
+                        mAuthor text NOT NULL,\
+                        mContent text NOT NULL, \
+                        mPublishTime datetime NOT NULL, \
+                        mCollectTime datetime NOT NULL
+                        mLikeCount int NOT NULL, \
+						mDislikeCount int NOT NULL, \
+						mCollectCount int NOT NULL, \
+						mTransmitCount int NOT NULL)'''
+
+        URL关系表：
+        '''CREATE TABLE IF NOT EXISTS UrlRelation(url text, \
+        				parentUrl text, \
+        				primary key(url,parentUrl))'''
+
+        相似URL表
+        '''CREATE TABLE IF NOT EXISTS SimilarUrl(url text, \
+        				similarUrl text, \
+        				primary key(url,similarUrl))'''
+
+        标签表：（sourceId不作外键约束）
+        '''CREATE TABLE IF NOT EXISTS TagTable(tag text, \
+        				parentTag text, \
+        				sourceId INTEGER, \
+        				primary key(tag,parentTag))'''
+
+		用户表：
+		'''CREATE TABLE IF NOT EXISTS UserTable(uid INTEGER PRIMARY KEY AUTOINCREMENT,
+						uname nvarchar(50) NOT NULL, \
+						upass varchar(50) NOT NULL, \
+						ufeature_uri ntext NULL, \
+						umail varchar(50) UNIQUE NOT NULL, \
+						udate datetime NOT NULL, \
+						uaddr ntext NULL, \
+						upro ntext NULL, \
+						uedu ntext NULL, \
+						uintro ntext NULL, \
+						uskill ntext NULL, \
+						upic image NULL)'''
 		
+
+		oracle建表语句：
+
+		create USER foragOwner identified by foragOwner;
+		grant CONNECT,RESOURCE to foragOwner;
+
+		CREATE TABLE MsgTable(mId INT PRIMARY KEY,
+                        mSource NVARCHAR2(100) NOT NULL UNIQUE,
+                        mTitle NVARCHAR2(100) NOT NULL,
+                        mIntro NVARCHAR2(200) NOT NULL,
+                        mPic NVARCHAR2(100) NOT NULL,
+                        mTags NVARCHAR2(100) NOT NULL,
+                        mAuthor NVARCHAR2(100) NOT NULL,
+                        mContent NCLOB NOT NULL,
+                        mPublishTime DATE NOT NULL,
+                        mCollectTime DATE NOT NULL,
+                        mLikeCount INT NOT NULL,
+                        mDislikeCount INT NOT NULL,
+                        mCollectCount INT NOT NULL,
+                        mTransmitCount INT NOT NULL);
+		create SEQUENCE MID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
+
+		CREATE TABLE UrlRelation(sourceUrl NVARCHAR2(100),
+                parentUrl NVARCHAR2(100),
+                primary key(sourceUrl,parentUrl));
+
+		CREATE TABLE SimilarUrl(sourceUrl NVARCHAR2(100),
+        				similarUrl NVARCHAR2(100),
+        				primary key(sourceUrl,similarUrl));
+
+		CREATE TABLE TagTable(sourceTag NVARCHAR2(20),
+                parentTag NVARCHAR2(20),
+                sourceId INT,
+                primary key(sourceTag,parentTag));
+
+        //uid与数据库冲突
+        CREATE TABLE UserTable(utId INT PRIMARY KEY,
+            utName nvarchar2(50) NOT NULL,
+            utPass varchar2(50) NOT NULL,
+            utFeatureUri varchar2(100) NULL,
+            utMail varchar2(50) UNIQUE NOT NULL,
+            utDate date NOT NULL,
+            utAddr varchar2(100) NULL,
+            utPro varchar2(100) NULL,
+            utEdu varchar2(100) NULL,
+            utIntro varchar2(100) NULL,
+            utSkill varchar2(100) NULL,
+            uPic varchar2(100) NULL);
+		create sequence UTID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
+
+		create ROLE foragTagger identified by foragTagger;
+		create ROLE foragRecommander identified by foragRecommander;
+		create ROLE foragCollecter identified by foragCollecter;
+
+		//导致无法设置用户默认角色而无法连接数据库
+		//grant CONNECT to foragTagger;
+		//grant CONNECT to foragRecommander;
+		//grant CONNECT to foragCollecter;
+		grant all on foragOwner.MsgTable to foragTagger;
+		grant all on foragOwner.MsgTable to foragRecommander;
+		grant all on foragOwner.MsgTable to foragCollecter;
+		grant all on foragOwner.TagTable to foragTagger;
+		grant all on foragOwner.TagTable to foragCollecter;
+		grant all on foragOwner.UrlRelation to foragRecommander;
+		grant all on foragOwner.SimilarUrl to foragCollecter;
+		grant all on foragOwner.SimilarUrl to foragRecommander;
+		grant all on foragOwner.UrlRelation to foragCollecter;
+		grant all on foragOwner.UserTable to foragRecommander;
+
+		grant select, insert, update, delete, alter on FORAGOWNER.MSGTABLE to FORAGTAGGER;
+
+		create user foragTagger_1 identified by foragTagger;
+		create user foragRecommander_1 identified by foragRecommander;
+		create user foragCollecter_1 identified by foragCollecter;
+		create user foragCollecter_2 identified by foragCollecter;
+		create user foragCollecter_3 identified by foragCollecter;
+
+		grant foragTagger,CONNECT to foragTagger_1;
+		grant foragRecommander,CONNECT to foragRecommander_1;
+		grant foragCollecter,CONNECT to foragCollecter_1;
+		grant foragCollecter,CONNECT to foragCollecter_2;
+		grant foragCollecter,CONNECT to foragCollecter_3; 
+
+		alter user foragTagger_1 default role foragTagger,CONNECT;
+		alter user foragRecommander_1 default role foragRecommander,CONNECT;
+		alter user foragCollecter_1 default role foragCollecter,CONNECT;
+		alter user foragCollecter_2 default role foragCollecter,CONNECT;
+		alter user foragCollecter_3 default role foragCollecter,CONNECT;
+		
+		//不知为何把自己创建的角色赋予用户，用户并不能拥有角色的权限，只有手动赋权
+		grant select,insert,delete,update,alter on MsgTable to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
+		grant select,insert,delete,update,alter on TagTable to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragTagger_1;
+		grant select,insert,delete,update,alter on UrlRelation to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1;
+		grant select,insert,delete,update,alter on SimilarUrl to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1;
+		grant select,insert,delete,update,alter on UserTable to foragRecommander_1;
 
 	可推荐的依据：
 	1.大分类
