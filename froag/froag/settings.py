@@ -79,7 +79,8 @@ DOWNLOADER_MIDDLEWARES = {
 ITEM_PIPELINES = {
     'froag.pipelines.EmptyItemDropPipeline': 300,
     'froag.pipelines.ItemContentFormatPipeline': 301,
-    'froag.pipelines.ItemStoreDBPipeline': 302,
+    'froag.pipelines.ItemTagExtractorPipleline': 302,
+    'froag.pipelines.ItemStoreDBPipeline': 303,
 }
 
 # # Enable and configure the AutoThrottle extension (disabled by default)
