@@ -9,28 +9,44 @@ import re, json, logging, os, sqlite3, cx_Oracle
 from froag.items import NewsItem
 
 DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-SQL_ORACLE_ADD_RELATION = 'INSERT INTO foragOwner.UrlRelation(sourceUrl,parentUrl) VALUES(?,?)'
-SQL_ORACLE_ADD_SIMILARURL = 'INSERT INTO SimilarUrl(sourceUrl,similarUrl) VALUES(?,?)'
+SQL_ORACLE_ADD_RELATION = 'INSERT INTO foragOwner.UrlRelation(sourceUrl,parentUrl) VALUES(:1,:2)'
+SQL_ORACLE_ADD_SIMILARURL = 'INSERT INTO foragOwner.SimilarUrl(sourceUrl,similarUrl) VALUES(:1,:2)'
 
 def storeUrlRelations_db_oracle(database, url_relations):
     cursor = database.cursor()
     cursor.prepare(SQL_ORACLE_ADD_RELATION)
-    cursor.executemany(None, url_relations)
+    
+    for item in url_relations:
+        try:
+            cursor.execute(None, item)
+        except cx_Oracle.IntegrityError:
+            pass 
+    
     database.commit()
     url_relations.clear()
     
 def storeSimilarUrls_db_oracle(database, similar_news_urls):
     cursor = database.cursor()
     cursor.prepare(SQL_ORACLE_ADD_SIMILARURL)
-    cursor.executemany(None, similar_news_urls)
+    
+    for item in similar_news_urls:
+        try:
+            cursor.execute(None, item)
+        except cx_Oracle.IntegrityError:
+            pass 
+        
     database.commit()
     similar_news_urls.clear()
     
 def storeItemExtraInfor_db_oracle(url_relations, similar_news_urls):
-    database = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
-    storeUrlRelations_db_oracle(database, url_relations)
-    storeSimilarUrls_db_oracle(database, similar_news_urls)
-    database.close()
+    print('extra store start')
+    urLen, snuLen = len(url_relations), len(similar_news_urls)
+    if urLen > 0 or snuLen > 0:
+        database = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
+        if urLen > 0: storeUrlRelations_db_oracle(database, url_relations)
+        if snuLen > 0: storeSimilarUrls_db_oracle(database, similar_news_urls)
+        print('extra store end')
+        database.close()
 
 def responseStrGenerator(response, selector, isEncoding=False, encoding='utf-8', pos=0):
     result = (' '.join(response.css(selector).extract())).strip()
@@ -56,8 +72,12 @@ class HuanqiuSpider(Spider):
     url_relations = []
     similar_news_urls = []
     item_counter = 0
-    item_store_number = 300
+    item_store_number = 20
     item_store_counter = 0
+    
+    FILTER_SUBWEBSITE = True
+    STORE_URLRELATIONS = True
+    STORE_SIMILARURLS = True
     
     DB_NAME = "similarUrls.db"
     SQL_CREATE_TABLE_SimilarUrl = '''CREATE TABLE IF NOT EXISTS SimilarUrl(url text,similarUrl text,primary key(url,similarUrl))'''
@@ -79,16 +99,17 @@ class HuanqiuSpider(Spider):
         if self.item_counter % self.item_store_number == 0:
             self.storeItemExtraInfor()
         
-        self.getSimilarNewUrl(response, response.url)
+        if self.STORE_SIMILARURLS: self.getSimilarNewUrl(response, response.url)
         
         parentUrl = response.url
         next_pages = response.css('a::attr("href")').extract()
         for next_page in next_pages:
             next_page = response.urljoin(next_page)
+            
             if re.match(self.url_pattern_article, next_page):
-                self.url_relations.append((str(next_page), str(parentUrl)))
+                if self.STORE_URLRELATIONS: self.url_relations.append((str(next_page), str(parentUrl)))
                 yield Request(next_page, callback=self.parse)
-            elif re.match(self.url_pattern_sub, next_page) and next_page not in self.sub_website:
+            elif self.FILTER_SUBWEBSITE and re.match(self.url_pattern_sub, next_page) and next_page not in self.sub_website:
                 self.sub_website.append(next_page)
                 yield Request(next_page, callback=self.parse)
     

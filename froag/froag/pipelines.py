@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#encoding=utf-8
 
 # Define your item pipelines here
 #
@@ -10,6 +10,9 @@ import time, sqlite3, cx_Oracle
 from bs4 import BeautifulSoup, Tag, Comment
 import re, json
 import jieba.analyse, snownlp
+
+tag_relation_tmp = []
+SQL_ORACLE_ADD_TAG = "INSERT INTO foragOwner.TagTable(sourceTag,parentTag,sourceId) VALUES(:1,:2,foragOwner.MID_SEQ.CURRVAL)"
 
 class EmptyItemDropPipeline(object):
     def process_item(self, item, spider):
@@ -80,8 +83,6 @@ class ItemTagExtractorPipleline(object):
     DEFAULT_PARSER = 'lxml'
     KEYWORD_NUMBER = 20
     MAX_TAG_NUMBER = 5
-    DATA_STORE_NUMBER = 50
-    DATA_COUNTER = 0
     
     def clacWordWeight(self, jb_tags, sn_tags, title_words):
         result_tags, min_tag_number, tag_rate = {}, 0, 0.0
@@ -105,11 +106,11 @@ class ItemTagExtractorPipleline(object):
         return result_tags, tag_len
     
     def generateTextFeature(self, item):
-        content = BeautifulSoup(item['mContent'], self.DEFAULT_PARSER)
+        content = BeautifulSoup(item['mcontent'], self.DEFAULT_PARSER)
         content = re.sub("\s", "", content.get_text())
         
         if content and len(content) != 0:
-            title_words = list(jieba.cut(item['mTitle']))
+            title_words = list(jieba.cut(item['mtitle']))
             jb_tags = jieba.analyse.extract_tags(content, self.KEYWORD_NUMBER, withWeight=True)
             result = snownlp.SnowNLP(content)
             sn_tags = result.keywords(self.KEYWORD_NUMBER)
@@ -128,20 +129,18 @@ class ItemTagExtractorPipleline(object):
             top_tag_map = {}
             for index in range(0,tag_len):
                 top_tag_map[top_tags[index][0]] = top_tags[index][1]
-            result_tag_text = {'type':item['mTags'], 'tag':top_tag_map}
+            result_tag_text = {'type':item['mtags'], 'tag':top_tag_map}
 
 #             print(item[self.ITEM_COLNAME_DICT['mSource']])
 #             print(result_tag_text)
 
 #             print(json.dumps(result_tag_text, indent=4, separators=(',', ': ')))
-            item['mTags'] = json.dumps(result_tag_text, indent=4, separators=(',', ': '))
-            self.tag_map[item['mTags']] = list(result_tag.keys())
-            self.DATA_COUNTER += 1
+            item['mtags'] = json.dumps(result_tag_text, indent=4, separators=(',', ': '))
+            tag_relation_tmp = [item['mtags'], list(result_tag.keys())]
     
     def process_item(self, item, spider):
         self.generateTextFeature(item)
-#         if DATA_COUNTER % DATA_STORE_NUMBER == 0:
-#             storeDataToDb(item_list, tag_map)
+        return item
     
 class ItemStoreDBPipeline(object):
 #     DB_NAME = "items.db"
@@ -162,7 +161,7 @@ class ItemStoreDBPipeline(object):
 #     '''
     
     item_counter = 0
-    item_store_number = 300
+    item_store_number = 20
     item_min_number = 0
     
 #     def __init__(self):
@@ -189,6 +188,15 @@ class ItemStoreDBPipeline(object):
     def close_spider(self, spider):
         self.database.commit()
         self.database.close()
+    
+    def commitAndStoreTag(self):
+        self.cursor.prepare(SQL_ORACLE_ADD_TAG)
+        pTag = tag_relation_tmp[0]
+        for sTag in tag_relation_tmp[1]:
+            try:
+                self.cursor.execute(None, (sTag, pTag))
+            except cx_Oracle.IntegrityError:
+                pass
     
     def process_item(self, item, spider):
         try:
