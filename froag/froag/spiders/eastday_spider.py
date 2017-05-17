@@ -4,15 +4,138 @@ from scrapy.spiders import CrawlSpider, Rule, Spider, Request
 from scrapy.linkextractors import LinkExtractor
 from scrapy.xlib.pydispatch import dispatcher
 from scrapy import signals
-import re, json, logging, os, sqlite3
+import re, json, logging, os, sqlite3, cx_Oracle
 
 from froag.items import NewsItem
+
+DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+SQL_ORACLE_ADD_RELATION = 'INSERT INTO foragOwner.UrlRelation(sourceUrl,parentUrl) VALUES(?,?)'
+SQL_ORACLE_ADD_SIMILARURL = 'INSERT INTO SimilarUrl(sourceUrl,similarUrl) VALUES(?,?)'
+
+def storeUrlRelations_db_oracle(database, url_relations):
+    cursor = database.cursor()
+    cursor.prepare(SQL_ORACLE_ADD_RELATION)
+    cursor.executemany(None, url_relations)
+    database.commit()
+    url_relations.clear()
+    
+def storeSimilarUrls_db_oracle(database, similar_news_urls):
+    cursor = database.cursor()
+    cursor.prepare(SQL_ORACLE_ADD_SIMILARURL)
+    cursor.executemany(None, similar_news_urls)
+    database.commit()
+    similar_news_urls.clear()
+    
+def storeItemExtraInfor_db_oracle(url_relations, similar_news_urls):
+    database = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
+    storeUrlRelations_db_oracle(database, url_relations)
+    storeSimilarUrls_db_oracle(database, similar_news_urls)
+    database.close()
 
 def responseStrGenerator(response, selector, isEncoding=False, encoding='utf-8', pos=0):
     result = (' '.join(response.css(selector).extract())).strip()
     if isEncoding:
         result = result.encode(encoding);
     return result
+
+class HuanqiuSpider(Spider):
+    name = 'huanqiu'
+    default_author_name = '环球网'
+    allowed_domains = []
+    start_urls = [
+        'http://www.huanqiu.com/'
+    ]
+    
+    url_pattern_article = 'http://.*\.huanqiu\.com/.*\.html'
+    url_pattern_sub = 'http://.*\.huanqiu\.com/.*/'
+    sub_website = []
+    
+    item_content_delete_tag = ['div', 'script']
+    item_content_tag_class = '.text'
+    
+    url_relations = []
+    similar_news_urls = []
+    item_counter = 0
+    item_store_number = 300
+    item_store_counter = 0
+    
+    DB_NAME = "similarUrls.db"
+    SQL_CREATE_TABLE_SimilarUrl = '''CREATE TABLE IF NOT EXISTS SimilarUrl(url text,similarUrl text,primary key(url,similarUrl))'''
+    SQL_ADD_SIMILARURL = "INSERT INTO SimilarUrl(url,similarUrl) VALUES(?,?)"
+    
+    def parse(self, response):
+        item = NewsItem()
+        item['msource'] = response.url
+        item['mtags'] = responseStrGenerator(response, '.topPath a:nth-of-type(2)::text')
+        item['mtitle'] = responseStrGenerator(response, '.conText h1::text')
+        item['mtime'] = responseStrGenerator(response, '.conText .summaryNew .timeSummary::text')
+        item['mauthor'] = responseStrGenerator(response, '.conText .summaryNew .fromSummary a::text')
+        item['mcontent'] = responseStrGenerator(response, '.conText .text')
+        item['mintro'] = responseStrGenerator(response, '.conText .text p:first-of-type::text')
+        item['mpic'] = responseStrGenerator(response, '.conText .text img:first-of-type::attr(src)')   
+        yield item
+        
+        self.item_counter = self.item_counter + 1  
+        if self.item_counter % self.item_store_number == 0:
+            self.storeItemExtraInfor()
+        
+        self.getSimilarNewUrl(response, response.url)
+        
+        parentUrl = response.url
+        next_pages = response.css('a::attr("href")').extract()
+        for next_page in next_pages:
+            next_page = response.urljoin(next_page)
+            if re.match(self.url_pattern_article, next_page):
+                self.url_relations.append((str(next_page), str(parentUrl)))
+                yield Request(next_page, callback=self.parse)
+            elif re.match(self.url_pattern_sub, next_page) and next_page not in self.sub_website:
+                self.sub_website.append(next_page)
+                yield Request(next_page, callback=self.parse)
+    
+    def getSimilarNewUrl(self, response, url):
+        similar_urls = response.css('.reTopics .listText ul a::attr("href")').extract()
+        similar_urls = [response.urljoin(url) for url in similar_urls]
+        if isinstance(similar_urls, list) and len(similar_urls) > 0:
+            url = str(url)
+            for surl in similar_urls:
+                self.similar_news_urls.append((url, str(surl)))
+    
+    def storeItemExtraInfor(self):
+        storeItemExtraInfor_db_oracle(self.url_relations, self.similar_news_urls)
+          
+    def storeUrls(self, way='db'):
+        if way == 'db':
+            self.storeUrls_db()
+    
+    def storeUrls_db(self):
+        database = sqlite3.connect(self.DB_NAME)
+        self.log('store similarUrl start', logging.INFO)
+        for key, value in self.similar_news_urls.items():
+            for listItem in value:
+                try:
+                    database.execute(self.SQL_ADD_SIMILARURL, (str(key), str(listItem)))
+                except sqlite3.IntegrityError:
+                    pass
+        database.commit()
+        self.similar_news_urls.clear()
+        self.log('store similarUrl commit', logging.INFO)
+        database.close()
+    
+    #     def __init__(self):
+#         self.createTable()
+    
+    def createTable(self):
+        try:
+            database = sqlite3.connect(self.DB_NAME)
+            database.execute(self.SQL_CREATE_TABLE_SimilarUrl)
+            database.commit()
+            database.close()
+        except sqlite3.Error:
+            self.log("create SimilarUrls table error", logging.WARN)
+    
+    def close(self):
+#         self.storeUrls()
+        self.storeItemExtraInfor()
 
 class EastdaySpider(Spider):
     name = 'eastday'
@@ -149,95 +272,6 @@ class EastdaySpider(Spider):
             if re.match(self.url_pattern, next_page):
 #                 self.insert_url(next_page, parentUrl, False)
                 yield Request(next_page, callback=self.parse)
-
-class HuanqiuSpider(Spider):
-    name = 'huanqiu'
-    default_author_name = '环球网'
-    allowed_domains = []
-    start_urls = [
-        'http://www.huanqiu.com/'
-    ]
-    
-    url_pattern_article = 'http://.*\.huanqiu\.com/.*\.html'
-    url_pattern_sub = 'http://.*\.huanqiu\.com/.*/'
-    sub_website = []
-    
-    item_content_delete_tag = ['div', 'script']
-    item_content_tag_class = '.text'
-    
-    similar_news_urls = {}
-    similar_url_counter = 0
-    similar_url_store_number = 300
-    
-    DB_NAME = "similarUrls.db"
-    SQL_CREATE_TABLE_SimilarUrl = '''CREATE TABLE IF NOT EXISTS SimilarUrl(url text,similarUrl text,primary key(url,similarUrl))'''
-    SQL_ADD_SIMILARURL = "INSERT INTO SimilarUrl(url,similarUrl) VALUES(?,?)"
-    
-    def __init__(self):
-        self.createTable()
-    
-    def createTable(self):
-        try:
-            database = sqlite3.connect(self.DB_NAME)
-            database.execute(self.SQL_CREATE_TABLE_SimilarUrl)
-            database.commit()
-            database.close()
-        except sqlite3.Error:
-            self.log("create SimilarUrls table error", logging.WARN)
-    
-    def parse(self, response):
-        item = NewsItem()
-        item['msource'] = response.url
-        item['mtags'] = responseStrGenerator(response, '.topPath a:nth-of-type(2)::text')
-        item['mtitle'] = responseStrGenerator(response, '.conText h1::text')
-        item['mtime'] = responseStrGenerator(response, '.conText .summaryNew .timeSummary::text')
-        item['mauthor'] = responseStrGenerator(response, '.conText .summaryNew .fromSummary a::text')
-        item['mcontent'] = responseStrGenerator(response, '.conText .text')
-        item['mintro'] = responseStrGenerator(response, '.conText .text p:first-of-type::text')
-        item['mpic'] = responseStrGenerator(response, '.conText .text img:first-of-type::attr(src)')   
-        yield item
-        
-        self.getSimilarNewUrl(response, response.url)
-        
-        next_pages = response.css('a::attr("href")').extract()
-        for next_page in next_pages:
-            next_page = response.urljoin(next_page)
-            if re.match(self.url_pattern_article, next_page):
-                yield Request(next_page, callback=self.parse)
-            elif re.match(self.url_pattern_sub, next_page) and next_page not in self.sub_website:
-                self.sub_website.append(next_page)
-                yield Request(next_page, callback=self.parse)
-            
-    
-    def getSimilarNewUrl(self, response, url):
-        similar_urls = response.css('.reTopics .listText ul a::attr("href")').extract()
-        similar_urls = [response.urljoin(url) for url in similar_urls]
-        if isinstance(similar_urls, list) and len(similar_urls) > 0:
-            self.similar_news_urls[url] = similar_urls
-            self.similar_url_counter = self.similar_url_counter + 1
-            if self.similar_url_counter % self.similar_url_store_number == 0:
-                self.storeUrls()
-            
-    def storeUrls(self, way='db'):
-        if way == 'db':
-            self.storeUrls_db()
-    
-    def storeUrls_db(self):
-        database = sqlite3.connect(self.DB_NAME)
-        self.log('store similarUrl start', logging.INFO)
-        for key, value in self.similar_news_urls.items():
-            for listItem in value:
-                try:
-                    database.execute(self.SQL_ADD_SIMILARURL, (str(key), str(listItem)))
-                except sqlite3.IntegrityError:
-                    pass
-        database.commit()
-        self.similar_news_urls.clear()
-        self.log('store similarUrl commit', logging.INFO)
-        database.close()
-    
-    def close(self):
-        self.storeUrls()
 
 class CEastdaySpider(CrawlSpider): 
     name = "ceastday" 
