@@ -6,13 +6,21 @@
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 
 from scrapy.exceptions import DropItem
-import time, sqlite3, cx_Oracle
+import time, os, sqlite3, cx_Oracle
 from bs4 import BeautifulSoup, Tag, Comment
 import re, json
 import jieba.analyse, snownlp
 
+
+TAG_STORE = True
 tag_relation_tmp = []
+DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
 SQL_ORACLE_ADD_TAG = "INSERT INTO foragOwner.TagTable(sourceTag,parentTag,sourceId) VALUES(:1,:2,foragOwner.MID_SEQ.CURRVAL)"
+SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime, \
+        mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
+        VALUES(foragOwner.MID_SEQ.NEXTVAL,:1,:2,:3,:4,:5,:6,:7,to_date(:8,'yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)
+    '''
+os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
 
 class EmptyItemDropPipeline(object):
     def process_item(self, item, spider):
@@ -25,7 +33,8 @@ class EmptyItemDropPipeline(object):
             elif spider.name == 'huanqiu':
                 item['mtime'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) if item['mtime'] == '' else item['mtime']
                 item['mauthor'] = spider.default_author_name if item['mauthor'] == '' else item['mauthor']
-                
+            
+            item['mintro'] = item['mintro'][0:(min(200, len(item['mintro'])))] 
             return item
         else:
 #                print('EmptyItemDropPipeline error')
@@ -135,8 +144,8 @@ class ItemTagExtractorPipleline(object):
 #             print(result_tag_text)
 
 #             print(json.dumps(result_tag_text, indent=4, separators=(',', ': ')))
-            item['mtags'] = json.dumps(result_tag_text, indent=4, separators=(',', ': '))
             tag_relation_tmp = [item['mtags'], list(result_tag.keys())]
+            item['mtags'] = json.dumps(result_tag_text, ensure_ascii=False)
     
     def process_item(self, item, spider):
         self.generateTextFeature(item)
@@ -171,14 +180,9 @@ class ItemStoreDBPipeline(object):
 #         database.commit()
 #         database.close()
 #         self.database = self.getDBConnection()
-    DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-    SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent, \
-                    mPublishYime,mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
-         VALUES(foragOwner.MID_SEQ.NEXTVAL,?,?,?,?,?,?,?,?,to_char(sysdate,'yyyy-mm-dd hh24:mi:ss'),0,0,0,0)
-    '''
 
     def __init__(self):
-        self.database = cx_Oracle.connect(self.DB_CONNECT_STRING)
+        self.database = cx_Oracle.connect(DB_CONNECT_STRING)
         self.cursor = self.database.cursor()
 
 #     def getDBConnection(self):
@@ -189,20 +193,22 @@ class ItemStoreDBPipeline(object):
         self.database.commit()
         self.database.close()
     
-    def commitAndStoreTag(self):
-        self.cursor.prepare(SQL_ORACLE_ADD_TAG)
-        pTag = tag_relation_tmp[0]
-        for sTag in tag_relation_tmp[1]:
-            try:
-                self.cursor.execute(None, (sTag, pTag))
-            except cx_Oracle.IntegrityError:
-                pass
+    def storeTag(self):
+        if len(tag_relation_tmp) > 0:
+            self.cursor.prepare(SQL_ORACLE_ADD_TAG)
+            pTag = tag_relation_tmp[0]
+            for sTag in tag_relation_tmp[1]:
+                try:
+                    self.cursor.execute(None, (sTag, pTag))
+                except cx_Oracle.IntegrityError:
+                    pass
     
     def process_item(self, item, spider):
         try:
 #             print('insert start')
-            self.cursor.execute(self.SQL_ADD_NEW_ITEM,
+            self.cursor.execute(SQL_ADD_NEW_ITEM,
                     (item['msource'],item['mtitle'],item['mintro'],item['mpic'],item['mtags'],item['mauthor'],item['mcontent'],item['mtime']))
+            if TAG_STORE: self.storeTag()
             self.item_counter = self.item_counter + 1
             if self.item_counter % self.item_store_number == 0:
                 self.database.commit()

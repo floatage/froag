@@ -8,48 +8,36 @@ import re, json, logging, os, sqlite3, cx_Oracle
 
 from froag.items import NewsItem
 
+os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
 DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
 SQL_ORACLE_ADD_RELATION = 'INSERT INTO foragOwner.UrlRelation(sourceUrl,parentUrl) VALUES(:1,:2)'
 SQL_ORACLE_ADD_SIMILARURL = 'INSERT INTO foragOwner.SimilarUrl(sourceUrl,similarUrl) VALUES(:1,:2)'
 
-def storeUrlRelations_db_oracle(database, url_relations):
+def storeDataList_db_oracle(database, dataList, sql):
     cursor = database.cursor()
-    cursor.prepare(SQL_ORACLE_ADD_RELATION)
+    cursor.prepare(sql)
     
-    for item in url_relations:
+    for item in dataList:
         try:
             cursor.execute(None, item)
         except cx_Oracle.IntegrityError:
             pass 
     
     database.commit()
-    url_relations.clear()
-    
-def storeSimilarUrls_db_oracle(database, similar_news_urls):
-    cursor = database.cursor()
-    cursor.prepare(SQL_ORACLE_ADD_SIMILARURL)
-    
-    for item in similar_news_urls:
-        try:
-            cursor.execute(None, item)
-        except cx_Oracle.IntegrityError:
-            pass 
-        
-    database.commit()
-    similar_news_urls.clear()
+    dataList.clear()
     
 def storeItemExtraInfor_db_oracle(url_relations, similar_news_urls):
-    print('extra store start')
     urLen, snuLen = len(url_relations), len(similar_news_urls)
     if urLen > 0 or snuLen > 0:
         database = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
-        if urLen > 0: storeUrlRelations_db_oracle(database, url_relations)
-        if snuLen > 0: storeSimilarUrls_db_oracle(database, similar_news_urls)
-        print('extra store end')
+        if urLen > 0: storeDataList_db_oracle(database, url_relations, SQL_ORACLE_ADD_RELATION)
+        if snuLen > 0: storeDataList_db_oracle(database, similar_news_urls, SQL_ORACLE_ADD_SIMILARURL)
         database.close()
 
-def responseStrGenerator(response, selector, isEncoding=False, encoding='utf-8', pos=0):
-    result = (' '.join(response.css(selector).extract())).strip()
+def responseStrGenerator(response, selector, isEncoding=False, encoding='utf-8', pos=1, getPart=False):
+    tags = response.css(selector)
+    if getPart: tags = tags[0:pos]
+    result = (' '.join(tags.extract())).strip()
     if isEncoding:
         result = result.encode(encoding);
     return result
@@ -92,7 +80,7 @@ class HuanqiuSpider(Spider):
         item['mauthor'] = responseStrGenerator(response, '.conText .summaryNew .fromSummary a::text')
         item['mcontent'] = responseStrGenerator(response, '.conText .text')
         item['mintro'] = responseStrGenerator(response, '.conText .text p:first-of-type::text')
-        item['mpic'] = responseStrGenerator(response, '.conText .text img:first-of-type::attr(src)')   
+        item['mpic'] = responseStrGenerator(response, '.conText .text img:first-of-type::attr(src)', getPart=True)   
         yield item
         
         self.item_counter = self.item_counter + 1  
@@ -278,7 +266,7 @@ class EastdaySpider(Spider):
         item['mauthor'] = responseStrGenerator(response, '.fl i:last-of-type::text')
         item['mcontent'] = responseStrGenerator(response, '.J-contain_detail_cnt')
         item['mintro'] = responseStrGenerator(response, '.J-contain_detail_cnt p:first-of-type::text')
-        item['mpic'] = responseStrGenerator(response, '.J-contain_detail_cnt img:first-of-type::attr(src)')
+        item['mpic'] = responseStrGenerator(response, '.J-contain_detail_cnt img:first-of-type::attr(src)', True)
                 
         yield item
         self.item_counter = self.item_counter + 1  

@@ -1,6 +1,6 @@
 #encoding=utf-8
 
-import sqlite3, re, json
+import sqlite3, re, json, os
 from bs4 import BeautifulSoup
 import jieba.analyse, snownlp
 import cx_Oracle
@@ -98,7 +98,7 @@ class TextClassfy:
 
             item = list(item)
 #             print(json.dumps(result_tag_text, indent=4, separators=(',', ': ')))
-            item[self.ITEM_COLNAME_DICT['mTags']] = json.dumps(result_tag_text, indent=4, separators=(',', ': '))
+            item[self.ITEM_COLNAME_DICT['mTags']] = json.dumps(result_tag_text,  ensure_ascii=False, indent=4, separators=(',', ': '))
             self.item_list.append(item)
             self.tag_map[item[self.ITEM_COLNAME_DICT['mTags']]] = list(result_tag.keys())
             self.DATA_COUNTER += 1
@@ -128,8 +128,7 @@ if __name__ == '__main__':
         mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
         VALUES(foragOwner.MID_SEQ.NEXTVAL,:1,:2,:3,:4,:5,:6,:7,to_date(:8,'yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)
     '''
-
-#     url_relations = [('dwa','dwa'),('daw','dwafae')]
+    
     item = {'mauthor': '环球网',
      'mcontent': '''<div>
                   <p>
@@ -154,44 +153,27 @@ if __name__ == '__main__':
                  </p>
                  </div>''',
      'mintro': '',
-     'mpic': 'http://himg2.huanqiu.com/attachment2010/2017/0516/16/49/20170516044903833.jpg '
-             'http://himg2.huanqiu.com/attachment2010/2017/0516/16/49/20170516044919429.jpg '
-             'http://himg2.huanqiu.com/attachment2010/2017/0516/16/49/20170516044931547.jpg '
-             'http://himg2.huanqiu.com/statics/images/more-icoCopy.png',
-     'msource': 'http://look.huanqiu.com/article/2017-05/10681142.html',
-     'mtags': '''guoji''',
-     'mtime': '2017-05-17 07:40:00',
-     'mtitle': '英女子自出生起每日拍一张肖像照 现已集齐7665张'}
-    
-    item = {'mauthor': 'dawesgr',
-     'mcontent': 'dawefs',
-     'mintro': 'daw',
-     'mpic': 'http://himg2.huanqiu.com/attachment2010/2017/0516/16/49/20170516044903833.jpg',
-     'msource': 'http://look.huanqiu.com/article/2017-05/106811422.html',
-     'mtags': 'guoji',
+     'mpic': 'http://himg2.huanqiu.com/attachment2010/2017/0516/16/49/20170516044903833.jpg ',
+     'msource': 'http://look.huanqiu.com/article/2017-05/06811342.html',
+     'mtags': '{"国际": "低洼", "打完": "滚刀肉"}',
      'mtime': '2017-05-17 07:40:00',
      'mtitle': '英女子自出生起每日拍一张肖像照 现已集齐7665张'}
 
-#     print(item)
+    os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
     database = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
     cursor = database.cursor()
-    data = (item['msource'],item['mtitle'],item['mintro'],item['mpic'],item['mtags'],item['mauthor'],item['mcontent'],item['mtime'])
-#     cursor.execute(SQL_ADD_NEW_ITEM)
-    cursor.execute(SQL_ADD_NEW_ITEM,(item['msource'],item['mtitle'],item['mintro'],item['mpic'],item['mtags'],item['mauthor'],item['mcontent'],item['mtime']))
-#     cursor.prepare(SQL_ORACLE_ADD_RELATION)
-#     cursor.executemany(None, url_relations)
+    
+    cursor.execute(SQL_ADD_NEW_ITEM, (item['msource'],item['mtitle'],item['mintro'],item['mpic'],
+        item['mtags'],item['mauthor'],item['mcontent'],item['mtime']))
     database.commit()
-#     {\n'
-#               '    "tag": {\n'
-#               '        "\\u7167\\u7247": 1.6220529843124578,\n'
-#               '        "21": 1.8491386418100138,\n'
-#               '        "\\u82cf\\u66fc": 4.929483730256695,\n'
-#               '        "\\u6bcf\\u65e5": 6.601033039196433,\n'
-#               '        "\\u4e00\\u5929\\u5929": 1.63884909870875\n'
-#               '    },\n'
-#               '    "type": "\\u535a\\u89c8"\n'
-#               '}
-#     url_relations.clear()
+    print('conmmit success')
+    result = cursor.execute('select * from foragOwner.msgtable').fetchall()
+ 
+    for item in result:
+        for field in item:
+            print(field)
+                
+    database.close()
 #     classfier = TextClassfy()
 #     items = classfier.getItem(5)
 #  
@@ -213,5 +195,3 @@ if __name__ == '__main__':
 #         print(result.tags)
 #         print(result.keywords())
 #         print(result.summary())
-
-        
