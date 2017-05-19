@@ -60,7 +60,7 @@ class HuanqiuSpider(Spider):
     url_relations = []
     similar_news_urls = []
     item_counter = 0
-    item_store_number = 20
+    item_store_number = 400
     item_store_counter = 0
     
     FILTER_SUBWEBSITE = True

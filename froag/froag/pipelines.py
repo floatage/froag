@@ -34,7 +34,8 @@ class EmptyItemDropPipeline(object):
                 item['mtime'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) if item['mtime'] == '' else item['mtime']
                 item['mauthor'] = spider.default_author_name if item['mauthor'] == '' else item['mauthor']
             
-            item['mintro'] = item['mintro'][0:(min(200, len(item['mintro'])))] 
+            item['mintro'] = item['mintro'][0:(min(200, len(item['mintro'])))]
+            item['mtitle'] = item['mtitle'][0:(min(100, len(item['mtitle'])))]
             return item
         else:
 #                print('EmptyItemDropPipeline error')
@@ -144,6 +145,7 @@ class ItemTagExtractorPipleline(object):
 #             print(result_tag_text)
 
 #             print(json.dumps(result_tag_text, indent=4, separators=(',', ': ')))
+            global tag_relation_tmp
             tag_relation_tmp = [item['mtags'], list(result_tag.keys())]
             item['mtags'] = json.dumps(result_tag_text, ensure_ascii=False)
     
@@ -170,7 +172,7 @@ class ItemStoreDBPipeline(object):
 #     '''
     
     item_counter = 0
-    item_store_number = 20
+    item_store_number = 100
     item_min_number = 0
     
 #     def __init__(self):
