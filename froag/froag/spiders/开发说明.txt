@@ -300,7 +300,7 @@ Scrapy：
 		修改product/network/admin下的listener.ora 和 tnsnames.ora 
 		在win7下存在权限问题，可将文件移动到其他地方后移回
 		需保持两个文件中的Ip地址一致，否则会出现pl/sql无法连接的情况
-		最后使用lsnrctl start重启监听器
+		最后使用lsnrctl start重启监听器，注意需要管理员权限
 
 		数据库设计说明：
 		简单起见使用CONNECT和RESOURCE两个系统角色
@@ -317,7 +317,7 @@ Scrapy：
 		数据库管理员：使用已存在的system  x1
 		数据所有者：具有CONNECT和RESOURCE两个角色  x1 
 		标签优化操作员：具有CONNECT和文章数据表、标签表的所有对象权限  x1
-		推荐系统用户：具有CONNECT和url关系表，相似url表，文章数据表，用户信息表的所有对象权限  x1
+		推荐系统用户：具有CONNECT和url关系表，相似url表，文章数据表，用户信息表，便签表的所有对象权限  x1
 		数据采集用户：具有CONNECT和url关系表，相似url表，文章数据表，标签表的所有对象权限  x3
 
 		数据采集分类所涉及的表结构：
@@ -374,13 +374,14 @@ Scrapy：
 		create USER foragOwner identified by foragOwner;
 		grant CONNECT,RESOURCE to foragOwner;
 
+		//把mPic和mIntro改为可为空，mTag改为NVARCHAR2(200) 2017-5-18
 		CREATE TABLE MsgTable(mId INT PRIMARY KEY,
-                        mSource NVARCHAR2(100) NOT NULL UNIQUE,
-                        mTitle NVARCHAR2(100) NOT NULL,
-                        mIntro NVARCHAR2(200) NOT NULL,
-                        mPic NVARCHAR2(100) NOT NULL,
-                        mTags NVARCHAR2(100) NOT NULL,
-                        mAuthor NVARCHAR2(100) NOT NULL,
+                        mSource NVARCHAR2(500) NOT NULL UNIQUE,
+                        mTitle NCLOB NOT NULL,
+                        mIntro NCLOB,
+                        mPic NCLOB,
+                        mTags NCLOB NOT NULL,
+                        mAuthor NVARCHAR2(500) NOT NULL,
                         mContent NCLOB NOT NULL,
                         mPublishTime DATE NOT NULL,
                         mCollectTime DATE NOT NULL,
@@ -390,32 +391,39 @@ Scrapy：
                         mTransmitCount INT NOT NULL);
 		create SEQUENCE MID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
 
-		CREATE TABLE UrlRelation(sourceUrl NVARCHAR2(100),
-                parentUrl NVARCHAR2(100),
+		CREATE TABLE UrlRelation(sourceUrl NVARCHAR2(500),
+                parentUrl NVARCHAR2(500),
                 primary key(sourceUrl,parentUrl));
 
-		CREATE TABLE SimilarUrl(sourceUrl NVARCHAR2(100),
-        				similarUrl NVARCHAR2(100),
+		CREATE TABLE SimilarUrl(sourceUrl NVARCHAR2(500),
+        				similarUrl NVARCHAR2(500),
         				primary key(sourceUrl,similarUrl));
 
-		CREATE TABLE TagTable(sourceTag NVARCHAR2(20),
-                parentTag NVARCHAR2(20),
+		CREATE TABLE TagTable(sourceTag NVARCHAR2(100),
+                parentTag NVARCHAR2(100),
                 sourceId INT,
                 primary key(sourceTag,parentTag));
+
+        //在插入时无法获取到当前插入的文章的ID，不过考虑到时间和空间效率，假设item是以顺序进入各个pipeline中的，
+        //可在插入item时获取序列的当前ID作为标签的sourceId
+        //CREATE TABLE TagTable(sourceTag NVARCHAR2(20),
+        //        parentTag NVARCHAR2(20),
+        //        sourceId NVARCHAR2(100),
+        //        primary key(sourceTag,parentTag));
 
         //uid与数据库冲突
         CREATE TABLE UserTable(utId INT PRIMARY KEY,
             utName nvarchar2(50) NOT NULL,
             utPass varchar2(50) NOT NULL,
-            utFeatureUri varchar2(100) NULL,
+            utFeatureUri varchar2(500) NULL,
             utMail varchar2(50) UNIQUE NOT NULL,
             utDate date NOT NULL,
-            utAddr varchar2(100) NULL,
-            utPro varchar2(100) NULL,
-            utEdu varchar2(100) NULL,
-            utIntro varchar2(100) NULL,
-            utSkill varchar2(100) NULL,
-            uPic varchar2(100) NULL);
+            utAddr nvarchar2(500) NULL,
+            utPro nvarchar2(200) NULL,
+            utEdu nvarchar2(200) NULL,
+            utIntro nvarchar2(500) NULL,
+            utSkill nvarchar2(200) NULL,
+            uPic nvarchar2(500) NULL);
 		create sequence UTID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
 
 		create ROLE foragTagger identified by foragTagger;
@@ -431,6 +439,7 @@ Scrapy：
 		grant all on foragOwner.MsgTable to foragCollecter;
 		grant all on foragOwner.TagTable to foragTagger;
 		grant all on foragOwner.TagTable to foragCollecter;
+		grant all on foragOwner.TagTable to foragRecommander;
 		grant all on foragOwner.UrlRelation to foragRecommander;
 		grant all on foragOwner.SimilarUrl to foragCollecter;
 		grant all on foragOwner.SimilarUrl to foragRecommander;
@@ -459,10 +468,43 @@ Scrapy：
 		
 		//不知为何把自己创建的角色赋予用户，用户并不能拥有角色的权限，只有手动赋权
 		grant select,insert,delete,update,alter on MsgTable to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
-		grant select,insert,delete,update,alter on TagTable to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragTagger_1;
+		grant select,insert,delete,update,alter on TagTable to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragTagger_1，foragRecommander_1;
 		grant select,insert,delete,update,alter on UrlRelation to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1;
 		grant select,insert,delete,update,alter on SimilarUrl to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1;
 		grant select,insert,delete,update,alter on UserTable to foragRecommander_1;
+
+		grant select,alter on MID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
+		grant select,alter on UTID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
+
+		注：5.17
+
+			在使用python的prepare加executemany一次性插入多条纪录时，sql语句的占位符不可使用？,应该使用:1,:2之类的
+			使用executemany并不能忽略单个数据出现约束异常，改回循环插入
+			在pipeline中过滤item后记得返回item
+
+		oracle编码问题：5.18
+			修改服务器的字符编码：设置nls_lang环境变量，修改oracle注册表中nls_lang字段
+			修改数据库内部编码步骤：
+			shutdown immediate
+			startup mount
+			alter system enable restricted session
+			alter system set job_queue_processes=0
+			alter system set aq_tm_processes=0
+			alter database open
+			alter database character set internal_use utf8
+			shutdown immediate
+			startup
+
+		cx_oracle编码问题：
+			需在程序之前加上：os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+			否则会出现sql中占位符无法绑定unicode字符，出现UnicodeError异常
+			并且就算使用encode编码sql语句，插入和查询的结果仍为乱码
+
+		注：在执行对数据库的修改操作时，若此时在另外一个客户端（比如pl/sql）修改了数据，
+			同时在python中也想修改数据时，此时会因为数据锁的原因导致python无限挂起
+
+		python中使用全局变量时应该使用global定义
+		在收集数据时偶尔会出现错误：cx_Oracle.DatabaseError: ORA-01461: 仅能绑定要插入 LONG 列的 LONG 值
 
 	可推荐的依据：
 	1.大分类
