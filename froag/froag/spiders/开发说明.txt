@@ -56,6 +56,7 @@
 5. NLTK/Pattern  jieba/loso/genius(中文分词工具)  SnowNLP(中文文本处理库)
 6. Firebug(JS已被解析，tbody)  XPather
 7. Scrapyd
+8. pillow
 
 Scrapy：
 	Command: 
@@ -503,8 +504,30 @@ Scrapy：
 		注：在执行对数据库的修改操作时，若此时在另外一个客户端（比如pl/sql）修改了数据，
 			同时在python中也想修改数据时，此时会因为数据锁的原因导致python无限挂起
 
-		python中使用全局变量时应该使用global定义
-		在收集数据时偶尔会出现错误：cx_Oracle.DatabaseError: ORA-01461: 仅能绑定要插入 LONG 列的 LONG 值
+		5.19
+
+		注：
+			python中使用全局变量时应该使用global定义
+			在收集数据时偶尔会出现错误：cx_Oracle.DatabaseError: ORA-01461: 仅能绑定要插入 LONG 列的 LONG 值
+			爬虫运行命令：scrapy crawl huanqiu --logfile log.txt -s JOBDIR=crawls/huanqiu-1
+
+		剩余问题：
+			1. 如何对待过时的文章  可考虑以插入时以发布时间排序，并以其为索引
+			2. 数据量过大如何提高查询和处理速度  为常用的字段添加索引
+			3. 如何根据原页面内容生成符合本网站风格的页面  应用样式模板，页面标签过滤
+			4. 如何调度存储用户访问时新生成的文章页面   需在MsgTable添加一个页面存储地址
+			5. 如何根据文章的标签和用户的兴趣、行为推荐合适的页面
+			6. 如何在标签库中提取出可做标签的命名实体（时间、地点、人物、机构）、动词专有名词、情感分析、知识库实体
+
+		需要和前台对接的接口：
+			1. 获取用户喜好页面简介
+			2. 获取具体页面
+			3. 上传页面模板、调度策略、爬虫组件
+
+		如何使用Java调用python程序接口：
+			1. 使用jython可在java中执行python代码，调用函数，执行脚本
+			2. 使用python编写一个小型服务器提供上述接口服务
+			3. 使用web服务器构建一个webAPI
 
 	可推荐的依据：
 	1.大分类
