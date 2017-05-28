@@ -529,6 +529,74 @@ Scrapy：
 			2. 使用python编写一个小型服务器提供上述接口服务
 			3. 使用web服务器构建一个webAPI
 
+		页面生成说明：5-27
+
+			前台获取显示的信息：用户评价按钮 文章评价信息（评论、收藏、点赞、踩、转发）  用户评论 
+
+			存在问题：图片大小和位置不正确
+			模板需要描述的样式：源地址 标签 作者  标题  内容 发布时间的位置及其样式 
+
+			样式模板文件描述示例：
+				[data: {
+						item: {
+							sql: 'select * from msgtable where mid=[params.pageid]',
+							fetchWay: 'one'
+						}, 
+						item-similar: {
+							sql: 'select * from msgtable,(select similarurl from similarurl where sourceurl=[item.MSOURCE]) s where msource=similarurl',
+							fetchWay: 'all'
+						}
+				},
+				rule: {
+					imgHandler: {
+						col: ['[item.MCONTENT]'],
+						way: 'web'
+					}
+				},
+				css:'xx.css',
+				layout: {
+					item: '<article class="item">
+		              <header class="item-head">
+		                <h3 class="item-title">[MTITLE:{single:true}]</h3>
+		                <section class="item-meta">
+		                  <span class="item-author">作者：<a href="#">[MAUTHOR:{single:true}]</a></span> •
+		                  <time class="item-date">[MTIME:{single:true}]</time>
+		                </section>
+		              </header>
+		              <section class="item-content">[MCONTENT:{single:true}]</section>
+		              <footer class="item-foot">
+		                <section class="item-souce"> 
+		                  <span class="item-source">
+		                    <a  href="[MSOURCE:{single:true}]">原网站</a>
+		                  </span>
+		                </section>
+		                <section class="item-tag">
+		                  <span class="label">[MTAG:{single:false,class:[label-danger,label-success,label-info,label-warning,label-primary]}]
+		                  </span>
+		                </section>
+		              </footer>
+		            </article>', 
+		            item-similar: '<section class="item-similar">
+		                <div class="table-responsive">
+		                  <table class="table table-hover">
+		                    <tr repeat="muti">
+		                      <td class="item-text" style="width:40%;">[MTITLE:{single:true}]</td>
+		                      <td style="width:25%;">
+		                          <div class="progress progress-xs">
+		                            <div class="progress-bar progress-bar-danger" style="width:[MHOT:{single:true}]"></div>
+		                          </div>
+		                      </td>
+		                      <td class="item-tag hidden-xs" style="width:35%;">
+		                         <span class="label">[MTAG:{single:false,class:[label-danger,label-success,label-info,label-warning,label-primary]}]
+		                  		</span>
+		                      </td>
+		                    </tr>
+		                  </table>
+		                 </div>
+		              </section>'
+		            }
+		        ]
+
 	可推荐的依据：
 	1.大分类
 	2.小分类及权值
