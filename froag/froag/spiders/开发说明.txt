@@ -537,65 +537,66 @@ Scrapy：
 			模板需要描述的样式：源地址 标签 作者  标题  内容 发布时间的位置及其样式 
 
 			样式模板文件描述示例：
-				[data: {
-						item: {
-							sql: 'select * from msgtable where mid=[params.pageid]',
-							fetchWay: 'one'
-						}, 
-						item-similar: {
-							sql: 'select * from msgtable,(select similarurl from similarurl where sourceurl=[item.MSOURCE]) s where msource=similarurl',
-							fetchWay: 'all'
+				{
+					"data": {
+							"item": {
+								"sql": "select * from msgtable where mid=[[params.pageid]]"
+							}, 
+							"item-similar": {
+								"sql": "select * from msgtable,(select similarurl from similarurl where sourceurl=[[item.MSOURCE]]) s where msource=similarurl"
+							}
+					},
+					"rule": {
+						"imghandler": {
+							"col": ["[[item.MCONTENT]]"],
+							"way": "web"
 						}
-				},
-				rule: {
-					imgHandler: {
-						col: ['[item.MCONTENT]'],
-						way: 'web'
-					}
-				},
-				css:'xx.css',
-				layout: {
-					item: '<article class="item">
-		              <header class="item-head">
-		                <h3 class="item-title">[MTITLE:{single:true}]</h3>
-		                <section class="item-meta">
-		                  <span class="item-author">作者：<a href="#">[MAUTHOR:{single:true}]</a></span> •
-		                  <time class="item-date">[MTIME:{single:true}]</time>
-		                </section>
-		              </header>
-		              <section class="item-content">[MCONTENT:{single:true}]</section>
-		              <footer class="item-foot">
-		                <section class="item-souce"> 
-		                  <span class="item-source">
-		                    <a  href="[MSOURCE:{single:true}]">原网站</a>
-		                  </span>
-		                </section>
-		                <section class="item-tag">
-		                  <span class="label">[MTAG:{single:false,class:[label-danger,label-success,label-info,label-warning,label-primary]}]
-		                  </span>
-		                </section>
-		              </footer>
-		            </article>', 
-		            item-similar: '<section class="item-similar">
-		                <div class="table-responsive">
-		                  <table class="table table-hover">
-		                    <tr repeat="muti">
-		                      <td class="item-text" style="width:40%;">[MTITLE:{single:true}]</td>
-		                      <td style="width:25%;">
-		                          <div class="progress progress-xs">
-		                            <div class="progress-bar progress-bar-danger" style="width:[MHOT:{single:true}]"></div>
-		                          </div>
-		                      </td>
-		                      <td class="item-tag hidden-xs" style="width:35%;">
-		                         <span class="label">[MTAG:{single:false,class:[label-danger,label-success,label-info,label-warning,label-primary]}]
-		                  		</span>
-		                      </td>
-		                    </tr>
-		                  </table>
-		                 </div>
-		              </section>'
-		            }
-		        ]
+					},
+					"style": {
+						"css":"xx.css",
+						"layout": 
+							"<article class='item'>
+				              <header class='item-head'>
+				                <h3 class='item-title'>[[MTITLE]]</h3>
+				                <section class='item-meta'>
+				                  <span class='item-author'>作者：<a href='#'>[[MAUTHOR]]</a></span> •
+				                  <time class='item-date'>[[MTIME]]</time>
+				                </section>
+				              </header>
+				              <section class='item-content'>[[MCONTENT]]</section>
+				              <footer class='item-foot'>
+				                <section class='item-souce'> 
+				                  <span class='item-source'>
+				                    <a  href='[[MSOURCE]]'>原网站</a>
+				                  </span>
+				                </section>
+				                <section class='item-tag'>
+				                  <span class='label' repeat='true' statement='class:[\"label-danger\",\"label-success\",\"label-info\",\"label-warning\",\"label-primary\"]'>[[MTAG]]
+				                  </span>
+				                </section>
+				              </footer>
+				            </article>'
+				            <section class='item-similar'>
+				           	 <div class='table-responsive'>
+				               <table class='table table-hover'>
+				                 <tr repeat='true'>
+				                   <td class='item-text' style='width:40%;'>[[MTITLE]]</td>
+				                   <td style='width:25%;'>
+				                      <div class='progress progress-xs'>
+				                        <div class='progress-bar progress-bar-danger' style='width:[[MHOT]]'></div>
+				                      </div>
+				                    </td>
+				                    <td class='item-tag hidden-xs' style='width:35%;'>
+				                      <span class='label' repeat='true' statement='class:[\"label-danger\",\"label-success\",\"label-info\",\"label-warning\",\"label-primary\"]'>[[MTAG]]
+				                  	  </span>
+				                    </td>
+				                 </tr>
+				                </table>
+				             </div>
+				            </section>"
+				    }
+				
+		        }
 
 	可推荐的依据：
 	1.大分类
