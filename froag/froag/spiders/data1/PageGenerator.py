@@ -1,19 +1,17 @@
 #encoding=utf-8
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 import urllib.request as ur
-import re, json, sqlite3, cx_oracle
+import re, json, sqlite3, copy, random, cx_oracle
 
 class PageGenerator:
+    DEFAULT_PARSER = 'lxml'
     FILE_DICT_DBNAME = 'pageDict.db'
     SQL_CREATE_DB = 'CREATE TABLE IF NOT EXISTS FileDict(pageId INTEGER priamry key, \
                         storeUrl text not null, \
                         requestCnt integer not null)'
     
-    DEFAULT_PARSER = 'lxml'
     SQL_GET_PAGE_PATH = 'select storeUrl from FileDict where pageId=?'
-    SQL_GET_PAGE = 'select * from MsgTable where mid=?'
-    SQL_GET_SIMILARPAGE = 'select * from msgtable,(select similarurl from similarurl where sourceurl=?) s where msource=similarurl'
     SQL_INSERT_PAGEDICT = 'insert into FileDict values(?,?,?)'
     SQL_REQUEST_PAGE = 'update FileDict set requestCnt+=1 where pageId=?'
     
@@ -24,6 +22,9 @@ class PageGenerator:
         self.picStoreDir = storeDir + 'images//'
         self.pageStoreDir = storeDir + 'pages//'
         self.downloader = PicDownloader()
+        
+        self.paramsDict = {}
+        self.paramVisitedDict = {}
     
     def __createDB__(self):
         db = sqlite3.connect(self.FILE_DICT_DBNAME)
@@ -69,6 +70,10 @@ class PageGenerator:
     def __generatePage__(self, params):
         template = json.loads(self.template)
         paramsDict = self.__templateDataFetch(self.connOR.cursor(), params, template['data'])
+        
+        self.paramsDict = paramsDict
+        self.paramVisitedDict = paramsDict.fromkeys(paramsDict.keys(), 0)
+        
         self.__templateRuleApply__(paramsDict, template['rule'])
         page = self.__templateStyleApply__(paramsDict, template['style'])
             
@@ -143,13 +148,80 @@ class PageGenerator:
             handler = self.__imageHandleWeb__ if templateRules["imgHandler"]=='web' else self.__imageHandleWeb__
             for col in cols:
                 colName = col[2:-2]
-                for row in paramsDict[colName]:
-                    handler(row)
+                
+                for index, row in enumerate(col):
+                    result = ''
+                    contentTree = BeautifulSoup(row)
+                    for imgTag in contentTree.find_all('img'):
+                        handler(imgTag)
+                    for child in contentTree.body.children:
+                        if isinstance(child, Tag):
+                            result += str(child)
+                    col[index] = result
+                
+                paramsDict[colName] = col
     
     def __templateStyleApply__(self, paramsDict, templateStyle):
-        page = ''
-        return page
+        page = BeautifulSoup(templateStyle['layout'], self.DEFAULT_PARSER)
+    
+        repeatTag = page.body.find_next(repeat="true")
+        while repeatTag:
+            del repeatTag['repeat']
+            statement = json.loads(repeatTag.attrs.get('statement', '{}'), '{}')
+            if statement != {}: del repeatTag['statement']
             
+            lackValue = re.search(r"\[\[.*?\]\]", str(repeatTag))
+            if lackValue:
+                for counter in range(0, len(paramsDict[lackValue.group(0)[2:-2]])-1):
+                    copyTag = copy.deepcopy(repeatTag)
+                    for attr, attrRule in statement.items():
+                        if attrRule['way'] == '+r':
+                            copyTag[attr] = '%s %s' % (' '.join(copyTag[attr]), random.choice(attrRule['values']))
+                    repeatTag.insert_after(copyTag)
+                    
+            for attr, attrRule in statement.items():
+                if attrRule['way'] == '+r':
+                    repeatTag[attr] = '%s %s' % (' '.join(repeatTag[attr]), random.choice(attrRule['values']))
+                    
+            repeatTag = repeatTag.find_next(repeat="true")
+        
+        for jsFile in templateStyle['js']:
+            jsTag = page.new_tag('script', src=jsFile)
+            page.body.insert(0, jsTag)
+        for cssFile in templateStyle['css']:
+            cssTag = page.new_tag('link', rel="stylesheet", href=cssFile)
+            page.body.insert(0, cssTag)
+        
+        for tag in page.body.find_all(self.__handlerLackValue__):
+            pass
+        
+        return page
+    
+    def __handlerLackValue__(self, tag):
+        valuePattern = re.compile(r"\[\[.*?\]\]")
+        isLackValue = False
+          
+        if tag.string:
+            lackTexts = valuePattern.findall(tag.string)
+            if len(lackTexts) != 0:
+                isLackValue = True
+                for lackText in lackTexts:
+                    lackTextValueName = lackText[2:-2]
+                    tag.string = tag.string.replace(lackText, self.paramsDict[lackTextValueName][self.paramVisitedDict[lackTextValueName]])
+                    self.paramVisitedDict[lackTextValueName] += 1
+          
+        for key, value in tag.attrs.items():
+            if isinstance(value, str):
+                lackAttrValues = valuePattern.findall(value)
+                if len(lackAttrValues) != 0:
+                    isLackValue = True
+                    for lackAttrValue in lackAttrValues:
+                        lackAttrValueName = lackText[2:-2]
+                        tag.attrs[key] = tag.attrs[key].replace(lackAttrValue, self.paramsDict[lackAttrValueName][self.paramVisitedDict[lackAttrValueName]]) 
+                        self.paramVisitedDict[lackAttrValueName] += 1
+                
+        return isLackValue
+          
     def __imageHandleLocal__(self, imgTag, template):
         pass
     
