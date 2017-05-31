@@ -2,7 +2,7 @@
 
 from bs4 import BeautifulSoup, Tag
 import urllib.request as ur
-import re, json, sqlite3, copy, random, cx_oracle
+import re, json, sqlite3, copy, random, os, codecs, cx_Oracle
 
 class PageGenerator:
     DEFAULT_PARSER = 'lxml'
@@ -16,7 +16,7 @@ class PageGenerator:
     SQL_REQUEST_PAGE = 'update FileDict set requestCnt+=1 where pageId=?'
     
     def __init__(self, template, connSL, connOR, storeDir):
-        self.template = template
+        self.template = re.sub('\s+', " ", template)
         self.connSL = connSL
         self.connOR = connOR
         self.picStoreDir = storeDir + 'images//'
@@ -39,7 +39,7 @@ class PageGenerator:
         if path != '':
             text = self.__getPage__(path)
         else:
-            text = self.__generatePage__(pageId)
+            text = self.__generatePage__({'pageid':[pageId]})
             
         return text
     
@@ -51,7 +51,7 @@ class PageGenerator:
         path = ''
         if result != None: 
             path = result[0]
-            cursor.execute(self.SQL_REQUEST_PAGE, {'pageid':pageId})
+            cursor.execute(self.SQL_REQUEST_PAGE, pageId)
             self.connSL.commit()
         
         return path
@@ -99,9 +99,9 @@ class PageGenerator:
         for key,value in params.items():
             paramsDict['params.' + key] = value
             
-        dataStatemetNames, dataStatemetLen = list(templateDataStatements.keys()), len(templateDataStatements)
+        dataStatemetNames, dataStatemetLen = list(templateDataStatements.keys()), len(templateDataStatements)+1
         statemetSeq, dataStatemetStack = ['params'], []
-        while (len(statemetSeq) == dataStatemetLen):
+        while (len(statemetSeq) != dataStatemetLen):
             if (len(dataStatemetStack) == 0):
                 dataStatemetStack.append((dataStatemetNames.pop(), 'params'))
                 
@@ -121,17 +121,17 @@ class PageGenerator:
                 if sta[0] not in statemetSeq:
                     statemetSeq.append(sta[0])
         
-        for statement in statemetSeq:
+        for statement in statemetSeq[1:]:
             sql = templateDataStatements[statement]['sql']
             depends = valuePattern.findall(sql)
             
             rs = None
             if len(depends) > 0: 
                 sqlValues = []
-                sql = valuePattern.sub('?', sql)
-                for depend in depends:
-                    depend = depend[2:-2]
-                    sqlValues.append(paramsDict[depend])
+                
+                for index, depend in enumerate(depends):
+                    sql = sql.replace(depend, ':%d' % index)
+                    sqlValues.append(paramsDict[depend[2:-2]][0])
                 rs = cursor.execute(sql, sqlValues).fetchall()
             else:
                 rs = cursor.execute(sql).fetchall()
@@ -143,23 +143,18 @@ class PageGenerator:
         return paramsDict
     
     def __templateRuleApply__(self, paramsDict, templateRules):
-        if "imgHandler" in templateRules:
-            cols = json.loads(templateRules["imgHandler"])
-            handler = self.__imageHandleWeb__ if templateRules["imgHandler"]=='web' else self.__imageHandleWeb__
+        if "imghandler" in templateRules:
+            cols, way = templateRules["imghandler"]['col'], templateRules["imghandler"]['way']
+            handler = self.__imageHandleWeb__ if way=='web' else self.__imageHandleWeb__
             for col in cols:
                 colName = col[2:-2]
                 
-                for index, row in enumerate(col):
-                    result = ''
-                    contentTree = BeautifulSoup(row)
+                for index, row in enumerate(paramsDict[colName]):
+                    contentTree = BeautifulSoup(row, self.DEFAULT_PARSER)
                     for imgTag in contentTree.find_all('img'):
                         handler(imgTag)
-                    for child in contentTree.body.children:
-                        if isinstance(child, Tag):
-                            result += str(child)
-                    col[index] = result
-                
-                paramsDict[colName] = col
+                    
+                    paramsDict[colName][index] = contentTree.body.prettify()[7:-8]
     
     def __templateStyleApply__(self, paramsDict, templateStyle):
         page = BeautifulSoup(templateStyle['layout'], self.DEFAULT_PARSER)
@@ -195,6 +190,7 @@ class PageGenerator:
         for tag in page.body.find_all(self.__handlerLackValue__):
             pass
         
+        page = page.body.prettify()[7:-8]
         return page
     
     def __handlerLackValue__(self, tag):
@@ -205,9 +201,24 @@ class PageGenerator:
             lackTexts = valuePattern.findall(tag.string)
             if len(lackTexts) != 0:
                 isLackValue = True
-                for lackText in lackTexts:
+                replaceWay = json.loads(tag.attrs.get('replaceway', '{}')).get('bs', [])
+                if len(replaceWay) != 0: del tag.attrs['replaceway'] 
+                
+                for index, lackText in enumerate(lackTexts):
                     lackTextValueName = lackText[2:-2]
-                    tag.string = tag.string.replace(lackText, self.paramsDict[lackTextValueName][self.paramVisitedDict[lackTextValueName]])
+                    lackTextValue = str(self.paramsDict[lackTextValueName][self.paramVisitedDict[lackTextValueName]])
+                    if index in replaceWay:
+                        tag.string = tag.string.replace(lackText, '')
+                        lackTextValue = BeautifulSoup(lackTextValue, self.DEFAULT_PARSER).body
+                        replaceTag = lackTextValue.contents[0]
+                        if replaceTag.name != 'div':
+                            replaceTag = lackTextValue.body.wrap(lackTextValue.new_tag('div'))
+                            replaceTag.div.body.unwrap()
+                            replaceTag = replaceTag.div
+                            
+                        tag.append(replaceTag)
+                    else:
+                        tag.string = tag.string.replace(lackText, lackTextValue)
                     self.paramVisitedDict[lackTextValueName] += 1
           
         for key, value in tag.attrs.items():
@@ -216,8 +227,8 @@ class PageGenerator:
                 if len(lackAttrValues) != 0:
                     isLackValue = True
                     for lackAttrValue in lackAttrValues:
-                        lackAttrValueName = lackText[2:-2]
-                        tag.attrs[key] = tag.attrs[key].replace(lackAttrValue, self.paramsDict[lackAttrValueName][self.paramVisitedDict[lackAttrValueName]]) 
+                        lackAttrValueName = lackAttrValue[2:-2]
+                        tag.attrs[key] = tag.attrs[key].replace(lackAttrValue, str(self.paramsDict[lackAttrValueName][self.paramVisitedDict[lackAttrValueName]]))
                         self.paramVisitedDict[lackAttrValueName] += 1
                 
         return isLackValue
@@ -239,3 +250,13 @@ class PicDownloader:
     
     def __picHandle(self, pic):
         pass
+    
+if __name__ == "__main__":
+    file = codecs.open('pageTemplate.json', 'r', encoding='utf8')
+    template = file.read()
+    file.close()
+    os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+    DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+    conn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
+    pg = PageGenerator(template, None, conn, '')
+    print(pg.__generatePage__({'pageid':[12687]}))

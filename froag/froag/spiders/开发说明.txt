@@ -540,10 +540,10 @@ Scrapy：
 				{
 					"data": {
 							"item": {
-								"sql": "select * from msgtable where mid=[[params.pageid]]"
+								"sql": "select * from foragOwner.msgtable where mid=[[params.pageid]]"
 							}, 
 							"item-similar": {
-								"sql": "select * from msgtable,(select similarurl from similarurl where sourceurl=[[item.MSOURCE]]) s where msource=similarurl"
+								"sql": "select * from foragOwner.msgtable,(select similarurl from foragOwner.similarurl where sourceurl=[[item.MSOURCE]]) s where msource=similarurl"
 							}
 					},
 					"rule": {
@@ -553,7 +553,7 @@ Scrapy：
 						}
 					},
 					"style": {
-						"css": ["xx.css"],
+						"css": ["css/articleTemplate.css"],
 						"js": ["xx.js"],
 						"layout": 
 							"<article class='item'>
@@ -561,10 +561,10 @@ Scrapy：
 				                <h3 class='item-title'>[[item.MTITLE]]</h3>
 				                <section class='item-meta'>
 				                  <span class='item-author'>作者：<a href='#'>[[item.MAUTHOR]]</a></span> •
-				                  <time class='item-date'>[[item.MTIME]]</time>
+				                  <time class='item-date'>[[item.MPUBLISHTIME]]</time>
 				                </section>
 				              </header>
-				              <section class='item-content'>[[item.MCONTENT]]</section>
+				              <section class='item-content' replaceway='{\"bs\":[0]}'>[[item.MCONTENT]]</section>
 				              <footer class='item-foot'>
 				                <section class='item-souce'> 
 				                  <span class='item-source'>
@@ -572,7 +572,7 @@ Scrapy：
 				                  </span>
 				                </section>
 				                <section class='item-tag'>
-				                  <span class='label' repeat='true' statement='{\"class\":{\"way\":\"+r\",\"values\":[\"label-danger\",\"label-success\",\"label-info\",\"label-warning\",\"label-primary\"]}}'>[[item.MTAG]]
+				                  <span class='label' repeat='true' statement='{\"class\":{\"way\":\"+r\",\"values\":[\"label-danger\",\"label-success\",\"label-info\",\"label-warning\",\"label-primary\"]}}'>[[item.MTAGS]]
 				                  </span>
 				                </section>
 				              </footer>
@@ -584,11 +584,11 @@ Scrapy：
 				                   <td class='item-text' style='width:40%;'>[[item-similar.MTITLE]]</td>
 				                   <td style='width:25%;'>
 				                      <div class='progress progress-xs'>
-				                        <div class='progress-bar progress-bar-danger' style='width:[[item-similar.MHOT]]'></div>
+				                        <div class='progress-bar progress-bar-danger' style='width:50%'></div>
 				                      </div>
 				                    </td>
 				                    <td class='item-tag hidden-xs' style='width:35%;'>
-				                      <span class='label' repeat='true' statement='{\"class\":{\"way\":\"+r\",\"values\":[\"label-danger\",\"label-success\",\"label-info\",\"label-warning\",\"label-primary\"]}}'>[[item.MTAG]]
+				                      <span class='label label-danger'>[[item-similar.MTAGS]]
 				                      </span>
 				                    </td>
 				                 </tr>
@@ -596,8 +596,8 @@ Scrapy：
 				             </div>
 				            </section>"
 				    }
-				
-		        }
+
+				}
 
 	可推荐的依据：
 	1.大分类
