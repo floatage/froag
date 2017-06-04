@@ -10,13 +10,16 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(('127.0.0.1', 9999))
     print('connect')
-    
+     
     while True:
         line = input('> ')
         sock.send(('%s\r\n' % line).encode())
-        print(sock.recv(1024))
-        
+        print(sock.recv(10240))
+         
     sock.close()
+
+#     file = open('articles//pages//test.txt', 'w')
+#     file.close()
 #     b1, b2 = BeautifulSoup('daw', 'lxml'), BeautifulSoup('<p>da</p><p>dwa</p>', 'lxml')
 #     b2.body.wrap(b2.new_tag('div'))
 #     b2.div.body.unwrap()

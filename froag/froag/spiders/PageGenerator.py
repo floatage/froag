@@ -6,40 +6,40 @@ import re, json, sqlite3, copy, random, os, codecs, cx_Oracle
 class PageGenerator:
     DEFAULT_PARSER = 'lxml'
     
-    SQL_GET_PAGE_PATH = 'select storeUrl from FileDict where pageId=?'
-    SQL_INSERT_PAGEDICT = 'insert into FileDict values(?,?,?)'
-    SQL_REQUEST_PAGE = 'update FileDict set requestCnt+=1 where pageId=?'
+    SQL_GET_PAGE_PATH = 'select storeUrl from FileDict where pageId=:1'
+    SQL_INSERT_PAGEDICT = 'insert into FileDict values(:1,:2,:3)'
+    SQL_REQUEST_PAGE = 'update FileDict set requestCnt=requestCnt+1 where pageId=:1'
     
-    def __init__(self, template, connSL, connOR, storeDir):
-        self.template = re.sub('\s+', " ", template)
+    def __init__(self, connSL, connOR, storeDir):
         self.connSL = connSL
         self.connOR = connOR
-        self.picStoreDir = storeDir + 'images//'
-        self.pageStoreDir = storeDir + 'pages//'
+        self.picStoreDir = storeDir + '//images//'
+        self.pageStoreDir = storeDir + '//pages//'
         self.downloader = PicDownloader()
         
         self.paramsDict = {}
         self.paramVisitedDict = {}
     
-    def getPage(self, pageId):
+    def getPage(self, pageId, template):
+        pageId = int(pageId)
         path = self.__pageSearch(pageId)
         text = ''
         if path != '':
             text = self.__getPage(path)
         else:
-            text = self.__generatePage({'pageid':[pageId]})
+            text = self.__generatePage({'pageid':[pageId]}, template)
             
         return text
     
     def __pageSearch(self, pageId):
         cursor = self.connSL.cursor()
-        rs = cursor.execute(self.SQL_GET_PAGE_PATH, pageId)
+        rs = cursor.execute(self.SQL_GET_PAGE_PATH, (pageId,))
         result = rs.fetchone()
         
         path = ''
         if result != None: 
             path = result[0]
-            cursor.execute(self.SQL_REQUEST_PAGE, pageId)
+            cursor.execute(self.SQL_REQUEST_PAGE, (pageId,))
             self.connSL.commit()
         
         return path
@@ -47,7 +47,7 @@ class PageGenerator:
     def __getPage(self, path):
         text = ''
         try:
-            file = open(path, 'r')
+            file = codecs.open(path, 'r', encoding='utf-8')
             text = file.read()
         except IOError:
             pass
@@ -55,8 +55,8 @@ class PageGenerator:
             file.close()
         return text
     
-    def __generatePage__(self, params):
-        template = json.loads(self.template)
+    def __generatePage(self, params, template):
+        template = json.loads(template)
         paramsDict = self.__templateDataFetch(self.connOR.cursor(), params, template['data'])
         
         self.paramsDict = paramsDict
@@ -65,13 +65,13 @@ class PageGenerator:
         self.__templateRuleApply(paramsDict, template['rule'])
         page = self.__templateStyleApply(paramsDict, template['style'])
             
-        storePath = self.pageStoreDir + str(params['pageid'][0])
-        pageFile = open(storePath, 'w')
+        storePath = self.pageStoreDir + str(params['pageid'][0]) + '.txt'
+        pageFile = codecs.open(storePath, 'w', encoding='utf-8')
         pageFile.write(page)
         pageFile.close()
-              
+                
         try:
-            self.connS.execute(self.SQL_INSERT_PAGEDICT, (params['pageid'][0], storePath, 1))
+            self.connSL.execute(self.SQL_INSERT_PAGEDICT, (params['pageid'][0], storePath, 1))
             self.connSL.commit()
         except sqlite3.IntegrityError:
             print('page:%d path insert error' % params['pageid'][0])
@@ -239,11 +239,12 @@ class PicDownloader:
         pass
     
 if __name__ == "__main__":
-    file = codecs.open('pageTemplate.json', 'r', encoding='utf8')
-    template = file.read()
+    file = codecs.open(r'pageTemplate/articleTemplate.json', 'r', encoding='utf8')
+    template = re.sub(r'\s+', " ", file.read())
     file.close()
     os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
     conn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
-    pg = PageGenerator(template, None, conn, '')
-    print(pg.__generatePage__({'pageid':[12687]}))
+    slConn = sqlite3.connect('pageDict.db')
+    pg = PageGenerator(slConn, conn, "articles")
+    print(pg.getPage(12687, template))

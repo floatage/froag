@@ -1,5 +1,8 @@
+#encoding=utf8
+
 import socketserver, json, threading
-import os, sqlite3, codecs, cx_Oracle
+import os, sqlite3, codecs, re, cx_Oracle
+import PageGenerator
 
 class ForagInterfaceHandler(socketserver.StreamRequestHandler):
     
@@ -38,7 +41,7 @@ class ForagInterfaceHandler(socketserver.StreamRequestHandler):
         self.wfile.write(json.dumps(response).encode())
             
 class ForagInterfaceServer:
-    def __init__(self, serve_addr, maxConnCnt=20):
+    def __init__(self, serve_addr, maxConnCnt=15):
         self.maxConnCnt = maxConnCnt
         self.server = socketserver.TCPServer(serve_addr, ForagInterfaceHandler)
         
@@ -53,27 +56,25 @@ class ForagInterfaceServer:
 class GetUserInterestPageService:
     def service(self, params, response):
         response['data'] = "GetUserInterestPageService"
-    
 
-    
+# {"name":"generatePage","params":{"pageid":"12687","template":"articleTemplate.json"}}
 class GeneratePageService:
-    
-    
-    
     FILE_DICT_DBNAME = 'pageDict.db'
-    SQL_CREATE_DB = 'CREATE TABLE IF NOT EXISTS FileDict(pageId INTEGER priamry key, \
+    SQL_CREATE_DB = 'CREATE TABLE IF NOT EXISTS FileDict(pageId INTEGER primary key, \
                         storeUrl text not null, \
                         requestCnt integer not null)'
-    
-    file = codecs.open('pageTemplate.json', 'r', encoding='utf8')
-    template = file.read()
-    file.close()
     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-    
+    PAGETEMPLATE_DIR = "pageTemplate//"
     
     def __init__(self):
+        self.__createDB()
+        
         os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
-        self.conn = cx_Oracle.connect(self.DB_CONNECT_STRING_ORACLE)
+        self.orConn = cx_Oracle.connect(self.DB_CONNECT_STRING_ORACLE)
+        self.slConn = sqlite3.connect(self.FILE_DICT_DBNAME)
+        
+        self.templateDict = {}
+        self.generator = PageGenerator.PageGenerator(self.slConn, self.orConn, 'articles')
     
     def __createDB(self):
         db = sqlite3.connect(self.FILE_DICT_DBNAME)
@@ -82,9 +83,18 @@ class GeneratePageService:
         db.commit()
         db.close()
     
-    def service(self, params, response):
+    def __getTemplate(self, name):
+        if name not in self.templateDict:
+            file = codecs.open(self.PAGETEMPLATE_DIR + name, 'r', encoding='utf8')
+            self.templateDict[name] = re.sub(r'\s+', " ", file.read())
+            file.close()
+    
+        return self.templateDict[name]
         
-        response['data'] = "GeneratePageService"
+    def service(self, params, response):
+        template = self.__getTemplate(params['params']['template'])
+        response['result'] = self.generator.getPage(params['params']['pageid'], template)
+        response['state'] = "success"
     
 class UploadPageTemplateService:
     def service(self, params, response):
