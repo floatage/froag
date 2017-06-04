@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#encoding=utf8
 
 # Define here the models for your scraped items
 #
