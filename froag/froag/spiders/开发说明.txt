@@ -611,6 +611,42 @@ Scrapy：
 				3. 样式展开
 				4. 数据填充
 
+
+	python函数式编程：
+	map,reduce(累计序列函数执行结果),fiter(筛选序列)
+	闭包(返回函数体内的函数，返回的函数可访问局部变量，主要用于惰性计算，但注意每次访问都产生一个新闭包，但所有闭包引用同一个局部变量)
+	装饰器(动态增加函数功能，返回函数，其他语言需借助装饰模式，python直接语言级别支持)
+	偏函数：绑定函数的某参数，类似C++的bind
+
+	python高级面向对象：
+	访问控制：__xx私有，_xx保护
+	动态类与实例：类与实例均可在代码中增加属性和方法，但可通过__slot__来限制
+	属性：@property读取  @property.setter
+	枚举类：enum模块
+	类定制：__len__,__str__,__iter__,__getitem__(对应[]),__getattr__,__call__(直接调用对象s())
+
+	python常用标准模块及功能：
+	struct(支持数据类型到字节的方便转换)
+	hashlib(多种hash摘要算法)
+	itertool(count, repeat, cycle, chain, groupby)
+	SQLAlchemy(提供ORM功能，对象关系映射)
+	ThreadLocal(线程全局对象，为每个线程分配不同的局部变量，但提供便捷访问，不同线程数据互不干扰，无需加锁)
+	select提供多种IO复用机制：
+		select:轮询一组文件描述符，返回活跃描述符，每次均需将fd从用户空间拷贝至内核空间，内核空间筛选fd，将活跃fd由内核至用户，且有最大数量限制
+		poll:改进select的fd文件描述符的最大数量限制
+		epoll：fd注册时直接拷贝至内核空间并绑定回调函数，fd活跃后直接调用回调函数，且使用MMap(将文件映射内存)避免fd的复制
+	selector：自动选择当前平台效率最高的IO复用机制
+	asynio: 
+		协程：轻量级线程，无切换开销，属于同一线程，但可随时中断去执行其他代码，无需加锁
+		将方法标记为异步，异步方法可调用其他异步方法，通过消息循环实现异步，新增asyn和await关键字
+	asyncore:
+	threading: 支持线程及其相应锁机制
+	mutiprocessing:
+	subprocess:
+	shced:事件调度器
+	queue:同步队列
+	concurrent:
+
 	可推荐的依据：
 	1.大分类
 	2.小分类及权值
