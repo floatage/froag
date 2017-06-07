@@ -1,6 +1,6 @@
 #encoding=utf8
 
-import socketserver, json, threading
+import socketserver, json, threading, multiprocessing
 import os, sqlite3, codecs, re, cx_Oracle
 import PageGenerator
 
@@ -41,7 +41,7 @@ class ForagInterfaceHandler(socketserver.StreamRequestHandler):
         self.wfile.write(json.dumps(response).encode())
             
 class ForagInterfaceServer:
-    def __init__(self, serve_addr, maxConnCnt=15):
+    def __init__(self, serve_addr, maxConnCnt=2):
         self.maxConnCnt = maxConnCnt
         self.server = socketserver.TCPServer(serve_addr, ForagInterfaceHandler)
         
@@ -52,12 +52,30 @@ class ForagInterfaceServer:
             t.start()
             
         self.server.serve_forever()
-    
+
+# {"name":"getUserInterestPage","params":{"user":{"detail":{},"interest":["数据库","python"]},"log":"日志文件","len":"10"}}
 class GetUserInterestPageService:
     def service(self, params, response):
+        params['len']
+        params['log']
+        params['user']['detail']
+        params['user']['interest']
         response['data'] = "GetUserInterestPageService"
 
-# {"name":"generatePage","params":{"pageid":"12687","template":"articleTemplate.json"}}
+# {"name":"getTagArticle","params":{"tag":"数据库","len":"10"}}
+class GetTagArticleService:
+    def service(self, params, response):
+        params['len']
+        response['data'] = "GetTagArticleService"
+
+# {"name":"getHotArticle","params":{"len":"10"}}
+class GetHotArticleService:
+    def service(self, params, response):
+        params['len']
+        response['data'] = "GetHotArticleService"
+
+#userid可用作协同过滤
+# {"name":"generatePage","params":{"pageid":"12687","template":"articleTemplate.json", "userid":"123"}}
 class GeneratePageService:
     FILE_DICT_DBNAME = 'pageDict.db'
     SQL_CREATE_DB = 'CREATE TABLE IF NOT EXISTS FileDict(pageId INTEGER primary key, \
@@ -95,15 +113,18 @@ class GeneratePageService:
         template = self.__getTemplate(params['params']['template'])
         response['result'] = self.generator.getPage(params['params']['pageid'], template)
         response['state'] = "success"
-    
+
+# {"name":"uploadPageTemplate","params":{"name":"模板一","file":"文件数据"}}
 class UploadPageTemplateService:
     def service(self, params, response):
         response['data'] = "UploadPageTemplateService"
-    
+
+# {"name":"uploadPageSchedule","params":{"name":"策略一","file":"文件数据"}}
 class UploadPageScheduleService:
     def service(self, params, response):
         response['data'] = "UploadPageScheduleService"
-    
+
+# {"name":"uploadSpider","params":{"name":"爬虫一","file":"文件数据"}}
 class UploadSpiderService:
     def service(self, params, response):
         response['data'] = "UploadSpiderService"

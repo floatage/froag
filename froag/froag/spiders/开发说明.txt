@@ -427,6 +427,30 @@ Scrapy：
             uPic nvarchar2(500) NULL);
 		create sequence UTID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
 
+		create table CMTTAB(
+		      cid int primary key,
+		      utid int not null,
+		      mid int not null,
+		      cparent_id int default -1 not null ,
+		      ctime DATE not null,
+		      ctext NCLOB not null
+		      croot_id int not null
+		);
+		create sequence CID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
+
+		create table msgToTagTab(
+		   tname nvarchar2(20) not null,
+		   mid int not null,
+		   mtweight float not null
+		);
+
+		create table hoTtagTab(
+		  htid int primary key,
+		  htdate date not null,
+		  tid_array NCLOB not null
+		);
+		create sequence HTID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
+
 		create ROLE foragTagger identified by foragTagger;
 		create ROLE foragRecommander identified by foragRecommander;
 		create ROLE foragCollecter identified by foragCollecter;
@@ -473,6 +497,14 @@ Scrapy：
 		grant select,insert,delete,update,alter on UrlRelation to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1;
 		grant select,insert,delete,update,alter on SimilarUrl to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1;
 		grant select,insert,delete,update,alter on UserTable to foragRecommander_1;
+
+		grant select,insert,delete,update,alter on CMTTABLE to foragCollecter_1;
+		grant select,alter on CID_SEQ to foragCollecter_1;
+
+		grant select,insert,delete,update,alter on HOTTAGTAB to foragCollecter_1;
+		grant select,alter on HTID_SEQ to foragCollecter_1;
+
+		grant select,insert,delete,update,alter on msgToTagTab to foragCollecter_1;
 
 		grant select,alter on MID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
 		grant select,alter on UTID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
@@ -722,3 +754,42 @@ Scrapy：
 	5.基于图的推荐算法
 	6.上下文(时间，地点，事件)对推荐的影响
 	Word sense disambiguation: Algorithms and application
+
+	推荐系统构成：
+	用户特征向量提取：评价、浏览、兴趣、基本信息、时间、热门程度
+	基于物品的协同过滤体现：看了此文章的也看了其他文章，记录所有用户请求页面的记录
+	推荐结果过滤：去重，去差，去掉不符合推荐需求和用户需求的
+	新颖性：降低热门物品的权值
+	多样性：结果分类、使推荐结果来自不同的理由、降低用户看过物品的权值、
+	SVD矩阵分解预测用户对某一物品的满意度，基于用户当前的矩阵数据填满矩阵
+	用户相似性评判：基于操作的欧几里得距离、求用户对相同物品评价拟合曲线斜率
+
+	系统接口服务器提供的服务：
+	1.获取用户兴趣页面
+		请求格式：{"name":"getUserInterestPage","params":{"user":{"detail":{},"interest":["数据库","python"]},"log":"日志文件","len":"10"}}
+		正常响应格式：{"state":"success","result":[数据列表]}
+		异常响应格式：{"state":"failed","reason":"执行异常信息或出错理由"}
+	2.获取指定标签页面简介
+		请求格式：{"name":"getTagArticle","params":{"tag":"数据库","len":"10","userid":"123"}}
+		正常响应格式：{"state":"success","result":[数据列表]}
+		异常响应格式：{"state":"failed","reason":"执行异常信息或出错理由"}
+	3.获取热门页面简介
+		请求格式：{"name":"getHotArticle","params":{"len":"10"}}
+		正常响应格式：{"state":"success","result":[数据列表]}
+		异常响应格式：{"state":"failed","reason":"执行异常信息或出错理由"}
+	4.获取指定id详细页面
+		请求格式：{"name":"generatePage","params":{"pageid":"12687","template":"articleTemplate.json", "userid":"123"}}
+		正常响应格式：{"state":"success","result":"生成的页面HTML文本"}
+		异常响应格式：{"state":"failed","reason":"执行异常信息或出错理由"}
+	5.上传页面模板
+		请求格式：{"name":"uploadPageTemplate","params":{"name":"模板一","file":"文件数据"}}
+		正常响应格式：{"state":"success"}
+		异常响应格式：{"state":"failed","reason":"执行异常信息或出错理由"}
+	6.上传页面调度策略
+		请求格式：{"name":"uploadPageSchedule","params":{"name":"策略一","file":"文件数据"}}
+		正常响应格式：{"state":"success"}
+		异常响应格式：{"state":"failed","reason":"执行异常信息或出错理由"}
+	7.上传爬虫
+		请求格式：{"name":"uploadSpider","params":{"name":"爬虫一","file":"文件数据"}}
+		正常响应格式：{"state":"success"}
+		异常响应格式：{"state":"failed","reason":"执行异常信息或出错理由"}
