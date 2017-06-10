@@ -81,7 +81,8 @@ class GeneratePageService:
     SQL_CREATE_DB = 'CREATE TABLE IF NOT EXISTS FileDict(pageId INTEGER primary key, \
                         storeUrl text not null, \
                         requestCnt integer not null)'
-    DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+#     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+    DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.43.16/orcl'
     PAGETEMPLATE_DIR = "pageTemplate//"
     
     def __init__(self):
@@ -113,11 +114,12 @@ class GeneratePageService:
         template = self.__getTemplate(params['params']['template'])
         response['result'] = self.generator.getPage(params['params']['pageid'], template)
         response['state'] = "success"
+        print(response['result'])
 
 # {"name":"uploadPageTemplate","params":{"name":"模板一","file":"文件数据"}}
 class UploadPageTemplateService:
     def service(self, params, response):
-        response['data'] = "UploadPageTemplateService"
+        response['data'] = codecs.open('pageTemplate/articleTemplate.css', 'r', 'utf-8').read()
 
 # {"name":"uploadPageSchedule","params":{"name":"策略一","file":"文件数据"}}
 class UploadPageScheduleService:
@@ -128,7 +130,7 @@ class UploadPageScheduleService:
 class UploadSpiderService:
     def service(self, params, response):
         response['data'] = "UploadSpiderService"
-    
+
 if __name__ == '__main__':
     server = ForagInterfaceServer(('', 9999))
     server.run()
