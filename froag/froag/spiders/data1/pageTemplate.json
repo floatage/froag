@@ -32,7 +32,7 @@
                     <a  href='[[item.MSOURCE]]'>原网站</a>
                   </span>
                 </section>
-                <section class='item-tag'>
+                <section class='item-tag' id='item_tag'>
                   <span class='label' repeat='true' statement='{\"class\":{\"way\":\"+r\",\"values\":[\"label-danger\",\"label-success\",\"label-info\",\"label-warning\",\"label-primary\"]}}'>[[item.MTAGS]]
                   </span>
                 </section>
@@ -40,7 +40,7 @@
             </article>
             <section class='item-similar'>
            	 <div class='table-responsive'>
-               <table class='table table-hover'>
+               <table class='table table-hover' id='similar_table'>
                  <tr repeat='true'>
                    <td class='item-text' style='width:40%;'>[[item-similar.MTITLE]]</td>
                    <td style='width:25%;'>

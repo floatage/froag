@@ -424,7 +424,8 @@ Scrapy：
             utEdu nvarchar2(200) NULL,
             utIntro nvarchar2(500) NULL,
             utSkill nvarchar2(200) NULL,
-            uPic nvarchar2(500) NULL);
+            utPic nvarchar2(500) NULL,
+            UTINTEREST nclob default '{}' NOT NULL);
 		create sequence UTID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
 
 		create table CMTTABLE(
@@ -505,6 +506,8 @@ Scrapy：
 		grant select,alter on HTID_SEQ to foragCollecter_1;
 
 		grant select,insert,delete,update,alter on msgToTagTab to foragCollecter_1;
+		grant select,insert,delete,update,alter on cmtTable to foragCollecter_1;
+		grant select,insert,delete,update,alter on userTable to foragCollecter_1;
 
 		grant select,alter on MID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
 		grant select,alter on UTID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
@@ -862,3 +865,10 @@ Scrapy：
 
 	mongodb，文档型非关系数据库，分为几大对象：database，collection，document，filed。提供非sql数据操作API，无事务，除增删改查、索引，
 	还提供limit，skip，aggregate，sort，mapreduce，regex。
+
+	现存问题：
+	1.在统计页面访问时，同一用户刷新都会产生一次访问记录，此记录同一用户连续访问应该只能加一次
+	2.将收集到的数据根据时间分表，将相同日期的信息存在同一张表，每天建立一张表，问题是在查询
+	指定Id的数据无法定位到相应表，可采用时间进行Hash
+
+	注：在python下访问nclob等大型数据在查询后只能查出对象地址，实际需要获取数据时需要再次访问数据库，所以在此之前不能关闭连接

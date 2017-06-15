@@ -144,7 +144,13 @@ class PageGenerator:
                     paramsDict[colName][index] = contentTree.body.prettify()[7:-8]
     
     def __templateStyleApply(self, paramsDict, templateStyle):
-        page = BeautifulSoup(templateStyle['layout'], self.DEFAULT_PARSER)
+        page = ''
+        for sectionKey, sectionValue in templateStyle['layout'].items():
+            for paramKey in paramsDict.keys():
+                if paramKey.find(sectionKey) != -1:
+                    page = page + sectionValue
+                    break
+        page = BeautifulSoup(page, self.DEFAULT_PARSER)
     
         repeatTag = page.body.find_next(repeat="true")
         while repeatTag:
@@ -183,7 +189,7 @@ class PageGenerator:
     def __handlerLackValue(self, tag):
         valuePattern = re.compile(r"\[\[.*?\]\]")
         isLackValue = False
-          
+        
         if tag.string:
             lackTexts = valuePattern.findall(tag.string)
             if len(lackTexts) != 0:
@@ -207,7 +213,7 @@ class PageGenerator:
                     else:
                         tag.string = tag.string.replace(lackText, lackTextValue)
                     self.paramVisitedDict[lackTextValueName] += 1
-          
+        
         for key, value in tag.attrs.items():
             if isinstance(value, str):
                 lackAttrValues = valuePattern.findall(value)

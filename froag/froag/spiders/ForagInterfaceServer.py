@@ -1,8 +1,13 @@
 #encoding=utf8
 
-import socketserver, json, threading, multiprocessing
-import os, sqlite3, codecs, re, cx_Oracle
+import socketserver, json, threading
+import os, sqlite3, codecs, re, traceback, cx_Oracle
 import PageGenerator
+
+FILE_DICT_DBNAME = 'pageDict.db'
+DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+# DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.43.16/orcl'
+os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
 
 class ForagInterfaceHandler(socketserver.StreamRequestHandler):
     
@@ -15,6 +20,8 @@ class ForagInterfaceHandler(socketserver.StreamRequestHandler):
         self.serviceDict['uploadPageTemplate'] = UploadPageTemplateService()
         self.serviceDict['uploadPageSchedule'] = UploadPageTemplateService()
         self.serviceDict['uploadSpider'] = UploadSpiderService()
+        self.serviceDict['getHotArticle'] = GetHotArticleService()
+        self.serviceDict['getTagArticle'] = GetTagArticleService()
     
     def registerService(self, name, serviceObj):
         self.serviceDict[name] = serviceObj
@@ -27,16 +34,20 @@ class ForagInterfaceHandler(socketserver.StreamRequestHandler):
         
         response = {}
         
-        try:
-            data = self.rfile.readline().decode()
-            print('recv:%s' % data)
-            requestParams = json.loads(data)
-            print(requestParams)
-            self.serviceDict[requestParams['name']].service(requestParams, response)
-        except Exception as e:
-            response['state'] = 'failed'
-            response['reason'] = str(e)
-            print(e)
+        data = self.rfile.readline().decode()
+        print('recv:%s' % data)
+        requestParams = json.loads(data)
+        print(requestParams)
+        self.serviceDict[requestParams['name']].service(requestParams, response)
+#         try:
+#             data = self.rfile.readline().decode()
+#             print('recv:%s' % data)
+#             requestParams = json.loads(data)
+#             print(requestParams)
+#             self.serviceDict[requestParams['name']].service(requestParams, response)
+#         except Exception:
+#             response['state'] = 'failed'
+#             response['reason'] = traceback.format_exc()
          
         self.wfile.write(json.dumps(response).encode())
             
@@ -62,41 +73,95 @@ class GetUserInterestPageService:
         params['user']['interest']
         response['data'] = "GetUserInterestPageService"
 
-# {"name":"getTagArticle","params":{"tag":"数据库","len":"10"}}
+# {"name":"getTagArticle","params":{"tag":"数据库","len":"10","userid":"123"}}
 class GetTagArticleService:
     def service(self, params, response):
         params['len']
         response['data'] = "GetTagArticleService"
 
-# {"name":"getHotArticle","params":{"len":"10"}}
+# {"name":"getHotArticle","params":{"len":"10", "userid":"123"}}
 class GetHotArticleService:
+    flushFrequence = 1800
+    flushTimes = 1000
+    msgListSize = 50
+    
+    SQL_GET_NEWEST_MSG = 'select mId, mTitle, mIntro, mPic, mTags, mAuthor, \
+        mPublishTime, mLikeCount, mDislikeCount, mCollectCount, mTransmitCount from \
+        (select * from foragOwner.MsgTable order by mPublishTime desc) where rownum<=:1'
+    SQL_GET_POPULAREST_MSG_ID = 'select pageId from FileDict order by requestCnt desc limit :1'
+    SQL_GET_POPULAREST_MSG = 'select mId, mTitle, mIntro, mPic, mTags, mAuthor, \
+        mPublishTime, mLikeCount, mDislikeCount, mCollectCount, mTransmitCount from foragOwner.MsgTable where mId in '
+    
+    def __init__(self):
+        self.hotMsg = []
+        self._getPopularestMsg()
+    
+    def _getMsgToList(self, sql, params):
+        conn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
+        try:
+            cursor = conn.cursor()
+            result = cursor.execute(sql, params).fetchall()
+            colName = list(map(lambda x:x[0], cursor.description))
+            for row in result:
+                colDict = {}
+                for index, col in enumerate(row):
+                    colDict[colName[index]] = col
+                self.hotMsg.append(colDict)
+                
+            for item in self.hotMsg:
+                for key, value in item.items():
+                    item[key] = str(value) if value!=None else ''
+        finally:
+            conn.close()
+    
+    def _getNewestMsg(self):
+        self._getMsgToList(self.SQL_GET_NEWEST_MSG, (self.msgListSize,))
+            
+    def _getPopularestMsg(self):
+        listFreeSize = self.msgListSize
+        conn = sqlite3.connect(FILE_DICT_DBNAME)
+        try:
+            cursor = conn.cursor()
+            pageIds = cursor.execute(self.SQL_GET_POPULAREST_MSG_ID, (self.msgListSize,)).fetchall()[0]
+            listFreeSize -= len(pageIds)
+            pageIds = str(pageIds) if len(pageIds) > 1 else '(%d)' % pageIds[0]
+        finally:
+            conn.close()
+            
+        self._getMsgToList(self.SQL_GET_POPULAREST_MSG + pageIds, ())
+        self._getMsgToList(self.SQL_GET_NEWEST_MSG, (listFreeSize,))
+        
+        self.timer = threading.Timer(self.flushFrequence, self._getPopularestMsg)
+        self.timer.start()
+        
+    def _getUserRequestOffset(self, userid, number):
+        return (0, 10)
+    
     def service(self, params, response):
-        params['len']
-        response['data'] = "GetHotArticleService"
+        offset = self._getUserRequestOffset(params['params']['userid'], params['params']['len'])
+        response['result'] = json.dumps(self.hotMsg[offset[0]:offset[1]], ensure_ascii=False)
+        response['state'] = 'success'
+        print(response['result'])
 
 #userid可用作协同过滤
 # {"name":"generatePage","params":{"pageid":"12687","template":"articleTemplate.json", "userid":"123"}}
 class GeneratePageService:
-    FILE_DICT_DBNAME = 'pageDict.db'
     SQL_CREATE_DB = 'CREATE TABLE IF NOT EXISTS FileDict(pageId INTEGER primary key, \
                         storeUrl text not null, \
                         requestCnt integer not null)'
-#     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-    DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.43.16/orcl'
     PAGETEMPLATE_DIR = "pageTemplate//"
     
     def __init__(self):
         self.__createDB()
         
-        os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
-        self.orConn = cx_Oracle.connect(self.DB_CONNECT_STRING_ORACLE)
-        self.slConn = sqlite3.connect(self.FILE_DICT_DBNAME)
+        self.orConn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
+        self.slConn = sqlite3.connect(FILE_DICT_DBNAME)
         
         self.templateDict = {}
         self.generator = PageGenerator.PageGenerator(self.slConn, self.orConn, 'articles')
     
     def __createDB(self):
-        db = sqlite3.connect(self.FILE_DICT_DBNAME)
+        db = sqlite3.connect(FILE_DICT_DBNAME)
         cursor = db.cursor()
         cursor.execute(self.SQL_CREATE_DB)
         db.commit()
@@ -134,3 +199,26 @@ class UploadSpiderService:
 if __name__ == '__main__':
     server = ForagInterfaceServer(('', 9999))
     server.run()
+
+#     conn = sqlite3.connect(FILE_DICT_DBNAME)
+#     try:
+#         cursor = conn.cursor()
+#         pageIds = cursor.execute(GetHotArticleService.SQL_GET_POPULAREST_MSG_ID, (10,)).fetchall()[0]
+#         pageIds = str(pageIds) if len(pageIds) > 1 else '(%d)' % pageIds[0]
+#     finally:
+#         conn.close()
+#     hotMsg = []
+#     conn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
+#     try:
+#         cursor = conn.cursor()
+#         print(GetHotArticleService.SQL_GET_POPULAREST_MSG + pageIds)
+#         result = cursor.execute(GetHotArticleService.SQL_GET_POPULAREST_MSG + pageIds, ())
+#         colName = list(map(lambda x:x[0], cursor.description))
+#         for row in result.fetchall():
+#             colDict = {}
+#             for index, col in enumerate(row):
+#                 colDict[colName[index]] = col
+#             hotMsg.append(colDict)
+#     finally:
+#         conn.close()
+#     print(hotMsg)
