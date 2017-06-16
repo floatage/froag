@@ -73,12 +73,36 @@ class GetUserInterestPageService:
         params['user']['interest']
         response['data'] = "GetUserInterestPageService"
 
-# {"name":"getTagArticle","params":{"tag":"数据库","len":"10","userid":"123"}}
+# {"name":"getTagArticle","params":{"type":"channel","name":"数据库","len":"10", "offset":"0", "userid":"123"}}
 class GetTagArticleService:
+    SQL_GET_TAG_MSG_ID = 'select tMsg from foragOwner.TagMsg where tName=:1'
+    SQL_GET_CHANNEL_MSG_ID = 'select cMsg from foragOwner.ChannelMsg where cName=:1'
+    SQL_GET_MSG = 'select mId, mTitle, mIntro, mPic, mTags, mAuthor, \
+        mPublishTime, mLikeCount, mDislikeCount, mCollectCount, mTransmitCount from foragOwner.MsgTable where in %s'
+    
+    def __init__(self):
+        self.conn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
+        
+    def _getTagMsg(self, name):
+        cursor = self.conn.cursor()
+        tagMsg = cursor.execute(self.SQL_GET_TAG_MSG, name).fetchone()
+        return tagMsg
+    
+    def _getChannelMsg(self, name):
+        cursor = self.conn.cursor()
+        channelMsg = cursor.execute(self.SQL_GET_CHANNEL_MSG, name).fetchone()
+        return channelMsg
+    
     def service(self, params, response):
-        params['len']
-        response['data'] = "GetTagArticleService"
+        params = params['params']
+        msgIds = self._getChannelMsg(params['name']) if params['type']=='channel' else self._getTagMsg(params['name'])    
+        msgIds = tuple(json.loads(msgIds).keys())
+        msgs = self.conn.execute(self.SQL_GET_MSG % (str(msgIds) if len(msgIds) > 1 else '(%d)' % msgIds[0])).fetchall()
 
+        response['result'] = json.dumps(msgs[int(params['offset']):int(params['offset']) + int(params['len'])], ensure_ascii=False)
+        response['state'] = 'success'
+        print(response['result'])
+        
 # {"name":"getHotArticle","params":{"len":"10", "userid":"123"}}
 class GetHotArticleService:
     flushFrequence = 1800

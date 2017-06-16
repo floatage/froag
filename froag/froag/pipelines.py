@@ -19,7 +19,7 @@ SQL_ORACLE_ADD_TAG = "INSERT INTO foragOwner.TagTable(sourceTag,parentTag,source
 SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime, \
         mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
         VALUES(foragOwner.MID_SEQ.NEXTVAL,:1,:2,:3,:4,:5,:6,:7,to_date(:8,'yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)
-    '''
+'''
 os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
 
 class EmptyItemDropPipeline(object):
@@ -204,6 +204,31 @@ class ItemStoreDBPipeline(object):
                     self.cursor.execute(None, (sTag, pTag))
                 except cx_Oracle.IntegrityError:
                     pass
+    
+    def storeTagMsgMap(self, item):
+        SQL_ORACLE_ADD_TAG_MSG = 'insert into foragOwner.TagMsg Values(:1,:2)'
+        SQL_ORACLE_ADD_CHANNEL_MSG = 'insert into foragOwner.ChannelMsg Values(:1,:2)'
+        SQL_ORACLE_UPDATE_TAG_MSG = 'update set foragOwner.TagMsg tMsg=:1'
+        SQL_ORACLE_UPDATE_CHANNEL_MSG = 'update set foragOwner.ChannelMsg cMsg=:1'
+        SQL_ORACLE_GET_TAG_MSG = 'select tMsg from foragOwner.TagMsg where tName=:1'
+        SQL_ORACLE_GET_CHANNEL_MSG = 'select cMsg from foragOwner.ChannelMsg where cName=:1'
+    
+        tags = json.loads(item['mTags'])
+    
+        channel = self.cursor.execute(SQL_ORACLE_GET_CHANNEL_MSG).fetchone()
+        if channel:
+            self.cursor.execute(SQL_ORACLE_ADD_CHANNEL_MSG, (tags['type'], '{"%s":"%s"}' % (item['mId'], item['mPublishTime'])))
+        else:
+            channelText = 
+            self.cursor.execute(SQL_ORACLE_UPDATE_CHANNEL_MSG, msg)
+        
+        tag = self.cursor.execute(SQL_ORACLE_GET_TAG_MSG).fetchone()
+        if tag:
+            for key, value in tags['tag'].items():
+                self.cursor.execute(SQL_ORACLE_ADD_TAG_MSG, 
+                    (key, '{"%s":{"date":"%s", "weight":"%s"}}' % (item['mId'], item['mPublishTime'], value)))
+        else:
+            self.cursor.execute(SQL_ORACLE_UPDATE_TAG_MSG)
     
     def process_item(self, item, spider):
         try:

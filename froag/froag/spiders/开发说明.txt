@@ -450,6 +450,17 @@ Scrapy：
 		  htdate date not null,
 		  tid_array NCLOB not null
 		);
+
+		create table TagMsg(
+		  tName nvarchar2(100) primary key,
+		  tMsg NCLOB default '{}' not null
+		);
+
+		create table ChannelMsg(
+		  cName nvarchar2(100) primary key,
+		  cMsg NCLOB default '{}' not null
+		);
+
 		create sequence HTID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
 
 		create ROLE foragTagger identified by foragTagger;
@@ -508,6 +519,9 @@ Scrapy：
 		grant select,insert,delete,update,alter on msgToTagTab to foragCollecter_1;
 		grant select,insert,delete,update,alter on cmtTable to foragCollecter_1;
 		grant select,insert,delete,update,alter on userTable to foragCollecter_1;
+
+		grant select,insert,delete,update,alter on TagMsg to foragCollecter_1;
+		grant select,insert,delete,update,alter on ChannelMsg to foragCollecter_1;
 
 		grant select,alter on MID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
 		grant select,alter on UTID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
@@ -872,3 +886,50 @@ Scrapy：
 	指定Id的数据无法定位到相应表，可采用时间进行Hash
 
 	注：在python下访问nclob等大型数据在查询后只能查出对象地址，实际需要获取数据时需要再次访问数据库，所以在此之前不能关闭连接
+
+
+	Tag,Channel表内ID存储格式：
+	tag:
+		{"id":{"date":"17:22 2015-6-7", "weight":"2.1111"}}
+	channel:
+		{"id":"17:22 2015-6-7"}
+
+	用户特征格式：
+	兴趣占比(结果筛选)，文章ID(协同过滤)，标签评价(新颖性)，加上用户信息，上下文(日期、地点)
+	{
+		"UserFeature":{
+			"interest":{
+				"channel":{
+					"国际"："5",
+					"娱乐"："5",
+					"科技"："5"
+				},
+				"tag":{
+					"UI"："5",
+					"数据库"："5",
+					"HTML"："5"
+				}
+			},
+			"evalute":{
+				"channel":{
+					"国际": "1"
+					"科技"："2"
+				},
+				"tag":{
+					"C++": "1",
+					"Java"："2"
+				}
+			},
+			"infor":{
+	            "addr" : "成都",
+	            "pro" : "研发工程师",
+	            "edu" : "成都信息工程大学",
+	            "skill" : "C++ Java"
+			},
+			"context":{
+				"prinvice":"四川"
+				"city":"成都",
+				"time":"16:14 2017-6-16"
+			}
+		}
+	}
