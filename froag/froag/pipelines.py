@@ -11,15 +11,24 @@ from bs4 import BeautifulSoup, Tag, Comment
 import re, json
 import jieba.analyse, snownlp
 
-
 TAG_STORE = True
+TAG_MSG_STORE = True
 tag_relation_tmp = []
-DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+# DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
 SQL_ORACLE_ADD_TAG = "INSERT INTO foragOwner.TagTable(sourceTag,parentTag,sourceId) VALUES(:1,:2,foragOwner.MID_SEQ.CURRVAL)"
 SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime, \
         mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
         VALUES(foragOwner.MID_SEQ.NEXTVAL,:1,:2,:3,:4,:5,:6,:7,to_date(:8,'yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)
 '''
+SQL_UPDATE_SEQ_MID = "update foragOwner.SeqTable set value=foragOwner.MID_SEQ.CURRVAL where name='foragOwner.MID_SEQ'"
+SQL_GET_SEQ_MID = "select value from foragOwner.SeqTable where name='foragOwner.MID_SEQ'"
+SQL_ORACLE_ADD_TAG_MSG = 'insert into foragOwner.TagMsg Values(:1,:2)'
+SQL_ORACLE_ADD_CHANNEL_MSG = 'insert into foragOwner.ChannelMsg Values(:1,:2)'
+SQL_ORACLE_UPDATE_TAG_MSG = 'update foragOwner.TagMsg set tMsg=:1 where tName=:2'
+SQL_ORACLE_UPDATE_CHANNEL_MSG = 'update foragOwner.ChannelMsg set cMsg=:1 where cName=:2'
+SQL_ORACLE_GET_TAG_MSG = 'select tMsg from foragOwner.TagMsg where tName=:1'
+SQL_ORACLE_GET_CHANNEL_MSG = 'select cMsg from foragOwner.ChannelMsg where cName=:1'
 os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
 
 class EmptyItemDropPipeline(object):
@@ -63,7 +72,7 @@ class ItemContentFormatPipeline(object):
                 if child.name in self.deleteTag:
                     child.decompose()
                 elif child.name in self.replaceTag:
-                    child.replace_with(child.string.strip())
+                    child.replace_with(child.string.strip() if child.string else '')
                 else:
                     self.tagAttrClear(child)
                     self.tagChildrenAttrClear(child)
@@ -172,7 +181,7 @@ class ItemStoreDBPipeline(object):
 #     '''
     
     item_counter = 0
-    item_store_number = 100
+    item_store_number = 50
     item_min_number = 0
     
 #     def __init__(self):
@@ -205,37 +214,55 @@ class ItemStoreDBPipeline(object):
                 except cx_Oracle.IntegrityError:
                     pass
     
-    def storeTagMsgMap(self, item):
-        SQL_ORACLE_ADD_TAG_MSG = 'insert into foragOwner.TagMsg Values(:1,:2)'
-        SQL_ORACLE_ADD_CHANNEL_MSG = 'insert into foragOwner.ChannelMsg Values(:1,:2)'
-        SQL_ORACLE_UPDATE_TAG_MSG = 'update set foragOwner.TagMsg tMsg=:1'
-        SQL_ORACLE_UPDATE_CHANNEL_MSG = 'update set foragOwner.ChannelMsg cMsg=:1'
-        SQL_ORACLE_GET_TAG_MSG = 'select tMsg from foragOwner.TagMsg where tName=:1'
-        SQL_ORACLE_GET_CHANNEL_MSG = 'select cMsg from foragOwner.ChannelMsg where cName=:1'
+    def insertSortInsert(self, container, element, func):
+        for index, item in enumerate(container):
+            if func(element, item):
+                container.insert(index, element)
+                break
     
-        tags = json.loads(item['mTags'])
-    
-        channel = self.cursor.execute(SQL_ORACLE_GET_CHANNEL_MSG).fetchone()
-        if channel:
-            self.cursor.execute(SQL_ORACLE_ADD_CHANNEL_MSG, (tags['type'], '{"%s":"%s"}' % (item['mId'], item['mPublishTime'])))
-        else:
-            channelText = 
-            self.cursor.execute(SQL_ORACLE_UPDATE_CHANNEL_MSG, msg)
+    def tagWeightClac(self, x, y):
+        dateWeight = 1.3
+        dateFormat = '%Y-%m-%d %H:%M:%S'
+        interval = time.mktime(time.strptime(x[1], dateFormat)) - time.mktime(time.strptime(y[1], dateFormat))
         
-        tag = self.cursor.execute(SQL_ORACLE_GET_TAG_MSG).fetchone()
-        if tag:
-            for key, value in tags['tag'].items():
-                self.cursor.execute(SQL_ORACLE_ADD_TAG_MSG, 
-                    (key, '{"%s":{"date":"%s", "weight":"%s"}}' % (item['mId'], item['mPublishTime'], value)))
+        if interval > 0:
+            return True if float(x[2])*dateWeight >= float(y[2]) else False
+        elif interval < 0:
+            return True if float(x[2]) >= float(y[2])*dateWeight else False
         else:
-            self.cursor.execute(SQL_ORACLE_UPDATE_TAG_MSG)
+            return True if float(x[2]) >= float(y[2]) else False
+        
+    def storeTagMsgMap(self, item, itemId):
+        tags = json.loads(item['mtags'])
+    
+        channel = self.cursor.execute(SQL_ORACLE_GET_CHANNEL_MSG, (tags['type'],)).fetchone()
+        if channel:
+            channel = json.loads(str(channel[0]))
+            self.insertSortInsert(channel, [itemId, item['mtime']], lambda x,y:True if x[1]>=y[1] else False)
+            channel = json.dumps(channel)
+            self.cursor.execute(SQL_ORACLE_UPDATE_CHANNEL_MSG, (channel, tags['type']))
+        else:
+            self.cursor.execute(SQL_ORACLE_ADD_CHANNEL_MSG, (tags['type'], '[["%s","%s"]]' % (itemId, item['mtime'])))
+        
+        for key, value in tags['tag'].items():
+            tag = self.cursor.execute(SQL_ORACLE_GET_TAG_MSG, (key,)).fetchone()
+            if tag:
+                tag = json.loads(str(tag[0]))
+                self.insertSortInsert(tag, [itemId, item['mtime'], value], self.tagWeightClac)
+                tag = json.dumps(tag)
+                self.cursor.execute(SQL_ORACLE_UPDATE_TAG_MSG, (tag, key))
+            else:
+                self.cursor.execute(SQL_ORACLE_ADD_TAG_MSG, (key, '[["%s","%s","%s"]]' % (itemId, item['mtime'], value)))
     
     def process_item(self, item, spider):
         try:
 #             print('insert start')
             self.cursor.execute(SQL_ADD_NEW_ITEM,
                     (item['msource'],item['mtitle'],item['mintro'],item['mpic'],item['mtags'],item['mauthor'],item['mcontent'],item['mtime']))
+            self.cursor.execute(SQL_UPDATE_SEQ_MID)
+            itemId = str(self.cursor.execute(SQL_GET_SEQ_MID).fetchone()[0])
             if TAG_STORE: self.storeTag()
+            if TAG_MSG_STORE: self.storeTagMsgMap(item, itemId)
             self.item_counter = self.item_counter + 1
             if self.item_counter % self.item_store_number == 0:
                 self.database.commit()

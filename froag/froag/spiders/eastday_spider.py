@@ -9,7 +9,8 @@ import re, json, logging, os, sqlite3, cx_Oracle
 from froag.items import NewsItem
 
 os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
-DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+# DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
 SQL_ORACLE_ADD_RELATION = 'INSERT INTO foragOwner.UrlRelation(sourceUrl,parentUrl) VALUES(:1,:2)'
 SQL_ORACLE_ADD_SIMILARURL = 'INSERT INTO foragOwner.SimilarUrl(sourceUrl,similarUrl) VALUES(:1,:2)'
 
@@ -52,7 +53,7 @@ class HuanqiuSpider(Spider):
     
     url_pattern_article = 'http://.*\.huanqiu\.com/.*\.html'
     url_pattern_sub = 'http://.*\.huanqiu\.com/.*/'
-    sub_website = []
+    sub_website = set()
     
     item_content_delete_tag = ['div', 'script']
     item_content_tag_class = '.text'
@@ -62,6 +63,8 @@ class HuanqiuSpider(Spider):
     item_counter = 0
     item_store_number = 400
     item_store_counter = 0
+    
+    request_url_recent = set()
     
     FILTER_SUBWEBSITE = True
     STORE_URLRELATIONS = True
@@ -86,6 +89,7 @@ class HuanqiuSpider(Spider):
         self.item_counter = self.item_counter + 1  
         if self.item_counter % self.item_store_number == 0:
             self.storeItemExtraInfor()
+            self.request_url_recent.clear()
         
         if self.STORE_SIMILARURLS: self.getSimilarNewUrl(response, response.url)
         
@@ -94,11 +98,12 @@ class HuanqiuSpider(Spider):
         for next_page in next_pages:
             next_page = response.urljoin(next_page)
             
-            if re.match(self.url_pattern_article, next_page):
+            if re.match(self.url_pattern_article, next_page) and next_page not in self.request_url_recent:
+                self.request_url_recent.add(next_page)
                 if self.STORE_URLRELATIONS: self.url_relations.append((str(next_page), str(parentUrl)))
                 yield Request(next_page, callback=self.parse)
             elif self.FILTER_SUBWEBSITE and re.match(self.url_pattern_sub, next_page) and next_page not in self.sub_website:
-                self.sub_website.append(next_page)
+                self.sub_website.add(next_page)
                 yield Request(next_page, callback=self.parse)
     
     def getSimilarNewUrl(self, response, url):

@@ -1,22 +1,25 @@
 #encoding=utf-8
-import cx_Oracle, os, re, json, copy, random, socket
+import cx_Oracle, os, re, json, copy, random, socket, time
 import urllib.request as ur
 from bs4 import BeautifulSoup, Tag
 
 paramsDict = {'item.MTAG':[1, 2], 'item-similar.MTITLE':[1, 2], 'item.MTITLE':[1]}
 paramVisitedDict = paramsDict.fromkeys(paramsDict.keys(), 0)
 
+
 if __name__ == '__main__':
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('127.0.0.1', 9999))
-    print('connect')
-     
-    while True:
-        line = input('> ')
-        sock.send(('%s\r\n' % line).encode())
-        print(sock.recv(10240))
-         
-    sock.close()
+    file = open('daw.txt', 'w')
+    print(dir(file))
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     sock.connect(('127.0.0.1', 9999))
+#     print('connect')
+#      
+#     while True:
+#         line = input('> ')
+#         sock.send(('%s\r\n' % line).encode())
+#         print(sock.recv(10240))
+#          
+#     sock.close()
 
 #     file = open('articles//pages//test.txt', 'w')
 #     file.close()
@@ -37,25 +40,28 @@ if __name__ == '__main__':
 #     print(page)
     
 #     os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
-#     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-# #     SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime, \
-# #         mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
-# #         VALUES(foragOwner.MID_SEQ.NEXTVAL,'%s','%s','%s','%s','%s','%s','%s',to_date('%s','yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)
-# #     '''
-#     SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime,\
-# mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount)\
-# VALUES(foragOwner.MID_SEQ.NEXTVAL,'dawfdsefadawwda','daw','daw','daw','daw','daw','daw',to_date('2017-05-17 09:55:00','yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)'''
-#    
+# #     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+#     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
+# # #     SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime, \
+# # #         mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
+# # #         VALUES(foragOwner.MID_SEQ.NEXTVAL,'%s','%s','%s','%s','%s','%s','%s',to_date('%s','yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)
+# # #     '''
+# #     SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime,\
+# # mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount)\
+# # VALUES(foragOwner.MID_SEQ.NEXTVAL,'dawfdsefadawwda','daw','daw','daw','daw','daw','daw',to_date('2017-05-17 09:55:00','yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)'''
+#     
 #     connection = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
 #     print('get connection')
 #     cursor = connection.cursor()
 #     print('get cursor')
+#     print(cursor.execute("select msource from foragOwner.msgtable where rownum<=1"))
+#     print(cursor.fetchone())
 #     SQL_ADD_NEW_ITEM = "INSERT INTO foragOwner.SimilarUrl(sourceUrl,similarUrl) VALUES('中dcdaw文','中文')"
-# #     print(SQL_ADD_NEW_ITEM)
-# #     cursor.execute(SQL_ADD_NEW_ITEM)
-# #     print('sql execute')
-# #     connection.commit()
-# #     print('conmmit success')
+#     print(SQL_ADD_NEW_ITEM)
+#     cursor.execute(SQL_ADD_NEW_ITEM)
+#     print('sql execute')
+#     connection.commit()
+#     print('conmmit success')
 #     result = cursor.execute('select * from foragOwner.MsgTable where rownum<=:1', [2]).fetchall()
 #     paramsDict = {}
 #     for index, col in enumerate(cursor.description):

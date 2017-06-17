@@ -461,6 +461,11 @@ Scrapy：
 		  cMsg NCLOB default '{}' not null
 		);
 
+		create table SeqTable(
+		  name nvarchar2(100) primary key,
+		  value int default 0 not null
+		);
+
 		create sequence HTID_SEQ minvalue 1 nomaxvalue start with 1 increment by 1 cache 20 nocycle;
 
 		create ROLE foragTagger identified by foragTagger;
@@ -522,6 +527,7 @@ Scrapy：
 
 		grant select,insert,delete,update,alter on TagMsg to foragCollecter_1;
 		grant select,insert,delete,update,alter on ChannelMsg to foragCollecter_1;
+		grant select,insert,delete,update,alter on SeqTable to foragCollecter_1;
 
 		grant select,alter on MID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
 		grant select,alter on UTID_SEQ to foragCollecter_1,foragCollecter_2,foragCollecter_3,foragRecommander_1,foragTagger_1;
@@ -889,10 +895,11 @@ Scrapy：
 
 
 	Tag,Channel表内ID存储格式：
-	tag:
-		{"id":{"date":"17:22 2015-6-7", "weight":"2.1111"}}
-	channel:
-		{"id":"17:22 2015-6-7"}
+	tag:存储默认以时间和相关度的加权排序
+		[["id","date","weight"],["id","date","weight"]]
+	channel:存储默认以时间排序
+		[["id","date"],["id","date"]]
+	但此操作要进行多次数据库查询更新操作和计算，后面专门用一个进程来进行此操作
 
 	用户特征格式：
 	兴趣占比(结果筛选)，文章ID(协同过滤)，标签评价(新颖性)，加上用户信息，上下文(日期、地点)
