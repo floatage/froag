@@ -6,20 +6,34 @@ from bs4 import BeautifulSoup, Tag
 paramsDict = {'item.MTAG':[1, 2], 'item-similar.MTITLE':[1, 2], 'item.MTITLE':[1]}
 paramVisitedDict = paramsDict.fromkeys(paramsDict.keys(), 0)
 
+def insertSortInsert(container, element, func):
+    for index, item in enumerate(container):
+        if func(element, item):
+            container.insert(index, element)
+            break
+    else:
+        print('daw')
+        container.append(element)
 
 if __name__ == '__main__':
-    file = open('daw.txt', 'w')
-    print(dir(file))
 #     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #     sock.connect(('127.0.0.1', 9999))
 #     print('connect')
-#      
+#       
 #     while True:
 #         line = input('> ')
 #         sock.send(('%s\r\n' % line).encode())
 #         print(sock.recv(10240))
-#          
+#           
 #     sock.close()
+
+    c = [7,6,1]
+    insertSortInsert(c, 10, lambda x,y:x>=y)
+    insertSortInsert(c, 8, lambda x,y:x>=y)
+    insertSortInsert(c, 0, lambda x,y:x>=y)
+    insertSortInsert(c, 11, lambda x,y:x>=y)
+    insertSortInsert(c, -1, lambda x,y:x>=y)
+    print(c)
 
 #     file = open('articles//pages//test.txt', 'w')
 #     file.close()

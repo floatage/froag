@@ -74,37 +74,51 @@ class GetUserInterestPageService:
         params['user']['interest']
         response['data'] = "GetUserInterestPageService"
 
-# {"name":"getTagArticle","params":{"type":"channel","name":"数据库","len":"10", "offset":"0", "userid":"123"}}
+# {"name":"getTagArticle","params":{"type":"tag","name":"数据库","len":"10", "offset":"0", "userid":"123"}}
 class GetTagArticleService:
     SQL_GET_TAG_MSG_ID = 'select tMsg from foragOwner.TagMsg where tName=:1'
     SQL_GET_CHANNEL_MSG_ID = 'select cMsg from foragOwner.ChannelMsg where cName=:1'
     SQL_GET_MSG = 'select mId, mTitle, mIntro, mPic, mTags, mAuthor, \
-        mPublishTime, mLikeCount, mDislikeCount, mCollectCount, mTransmitCount from foragOwner.MsgTable where in %s'
+        mPublishTime, mLikeCount, mDislikeCount, mCollectCount, mTransmitCount from foragOwner.MsgTable where mId in '
     
     def __init__(self):
         self.conn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
         
     def _getTagMsg(self, name):
         cursor = self.conn.cursor()
-        tagMsg = cursor.execute(self.SQL_GET_TAG_MSG, name).fetchone()
+        tagMsg = cursor.execute(self.SQL_GET_TAG_MSG_ID, (name,)).fetchone()
         return tagMsg
     
     def _getChannelMsg(self, name):
         cursor = self.conn.cursor()
-        channelMsg = cursor.execute(self.SQL_GET_CHANNEL_MSG, name).fetchone()
+        channelMsg = cursor.execute(self.SQL_GET_CHANNEL_MSG_ID, (name,)).fetchone()
         return channelMsg
     
     def service(self, params, response):
         params = params['params']
-        msgIds = self._getChannelMsg(params['name']) if params['type']=='channel' else self._getTagMsg(params['name'])    
-        msgIds = tuple(json.loads(msgIds).keys())
-        msgs = self.conn.execute(self.SQL_GET_MSG % (str(msgIds) if len(msgIds) > 1 else '(%d)' % msgIds[0])).fetchall()
-
-        response['result'] = json.dumps(msgs[int(params['offset']):int(params['offset']) + int(params['len'])], ensure_ascii=False)
+        msgIds = self._getChannelMsg(params['name']) if params['type']=='channel' else self._getTagMsg(params['name'])
+        if msgIds: 
+            begin = int(params['offset'])
+            end = begin + int(params['len'])
+            begin = 0 if begin > len(msgIds) else begin
+            end = len(msgIds) if end > len(msgIds) else end
+            msgIds = tuple(map(lambda x:int(x[0]), json.loads(str(msgIds[0]))))
+            msgIds = msgIds[begin:end]
+            msgIds = str(msgIds) if len(msgIds) > 1 else '(%d)' % msgIds[0]
+            
+            cursor = self.conn.cursor()
+            msgs = cursor.execute(self.SQL_GET_MSG + msgIds).fetchall()
+            for index,msg in enumerate(msgs):
+                msgs[index] = [str(v) for v in msg]
+            
+            response['result'] = json.dumps(msgs, ensure_ascii=False)
+        else:
+            response['result'] = '[]'
+        
         response['state'] = 'success'
         print(response['result'])
         
-# {"name":"getHotArticle","params":{"len":"10", "userid":"123"}}
+# {"name":"getHotArticle","params":{"len":"10", "userid":"123", "offset":"0"}}
 class GetHotArticleService:
     flushFrequence = 1800
     flushTimes = 1000
@@ -147,23 +161,29 @@ class GetHotArticleService:
         conn = sqlite3.connect(FILE_DICT_DBNAME)
         try:
             cursor = conn.cursor()
-            pageIds = cursor.execute(self.SQL_GET_POPULAREST_MSG_ID, (self.msgListSize,)).fetchall()[0]
-            listFreeSize -= len(pageIds)
-            pageIds = str(pageIds) if len(pageIds) > 1 else '(%d)' % pageIds[0]
+            pageIds = cursor.execute(self.SQL_GET_POPULAREST_MSG_ID, (self.msgListSize,)).fetchall()
+            if pageIds:
+                listFreeSize -= len(pageIds)
+                pageIds = pageIds[0]
+                pageIds = str(pageIds) if len(pageIds) > 1 else '(%d)' % pageIds[0]
+                self._getMsgToList(self.SQL_GET_POPULAREST_MSG + pageIds, ())
         finally:
             conn.close()
             
-        self._getMsgToList(self.SQL_GET_POPULAREST_MSG + pageIds, ())
         self._getMsgToList(self.SQL_GET_NEWEST_MSG, (listFreeSize,))
         
         self.timer = threading.Timer(self.flushFrequence, self._getPopularestMsg)
         self.timer.start()
         
-    def _getUserRequestOffset(self, userid, number):
-        return (0, 10)
+    def _getUserRequestOffset(self, userid, offset, number):
+        begin = int(offset)
+        end = begin + int(number)
+        begin = 0 if begin > self.msgListSize else begin
+        end = self.msgListSize if end > self.msgListSize else end
+        return (begin, end)
     
     def service(self, params, response):
-        offset = self._getUserRequestOffset(params['params']['userid'], params['params']['len'])
+        offset = self._getUserRequestOffset(params['params']['userid'], params['params']['offset'], params['params']['len'])
         response['result'] = json.dumps(self.hotMsg[offset[0]:offset[1]], ensure_ascii=False)
         response['state'] = 'success'
         print(response['result'])
