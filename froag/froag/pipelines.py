@@ -223,12 +223,11 @@ class ItemStoreDBPipeline(object):
             container.append(element)
     
     def timeInterval(self, x, y):
-        dateFormat = '%Y-%m-%d %H:%M:%S'
-        return time.mktime(time.strptime(x[1], dateFormat)) - time.mktime(time.strptime(y[1], dateFormat))
+        return time.mktime(time.strptime(x, '%Y-%m-%d %H:%M:%S')) - time.mktime(time.strptime(y, '%Y-%m-%d %H:%M:%S'))
     
     def tagWeightClac(self, x, y):
         dateWeight = 1.3
-        interval = self.timeInterval(x, y)
+        interval = self.timeInterval(x[1], y[1])
         
         if interval > 0.0:
             return float(x[2])*dateWeight >= float(y[2])
@@ -244,8 +243,7 @@ class ItemStoreDBPipeline(object):
         if channel:
             channel = json.loads(str(channel[0]))
             self.insertSortInsert(channel, [itemId, item['mtime']], lambda x,y:self.timeInterval(x[1],y[1])>=0.0)
-            channel = json.dumps(channel)
-            self.cursor.execute(SQL_ORACLE_UPDATE_CHANNEL_MSG, (channel, tags['type']))
+            self.cursor.execute(SQL_ORACLE_UPDATE_CHANNEL_MSG, (json.dumps(channel), tags['type']))
         else:
             self.cursor.execute(SQL_ORACLE_ADD_CHANNEL_MSG, (tags['type'], '[["%s","%s"]]' % (itemId, item['mtime'])))
         
@@ -254,8 +252,7 @@ class ItemStoreDBPipeline(object):
             if tag:
                 tag = json.loads(str(tag[0]))
                 self.insertSortInsert(tag, [itemId, item['mtime'], value], self.tagWeightClac)
-                tag = json.dumps(tag)
-                self.cursor.execute(SQL_ORACLE_UPDATE_TAG_MSG, (tag, key))
+                self.cursor.execute(SQL_ORACLE_UPDATE_TAG_MSG, (json.dumps(tag), key))
             else:
                 self.cursor.execute(SQL_ORACLE_ADD_TAG_MSG, (key, '[["%s","%s","%s"]]' % (itemId, item['mtime'], value)))
     

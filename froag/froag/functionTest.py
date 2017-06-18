@@ -1,39 +1,52 @@
 #encoding=utf-8
-import cx_Oracle, os, re, json, copy, random, socket, time
+import cx_Oracle, os, re, json, copy, random, socket, time, sched, copy
 import urllib.request as ur
 from bs4 import BeautifulSoup, Tag
 
 paramsDict = {'item.MTAG':[1, 2], 'item-similar.MTITLE':[1, 2], 'item.MTITLE':[1]}
 paramVisitedDict = paramsDict.fromkeys(paramsDict.keys(), 0)
+ 
+#初始化sched模块的scheduler类
+#第一个参数是一个可以返回时间戳的函数，第二个参数可以在定时未到达之前阻塞。
+# s = sched.scheduler(time.time,time.sleep)
+#  
+# #enter四个参数分别为：间隔事件、优先级（用于同时间到达的两个事件同时执行时定序）、被调用触发的函数，给他的参数（注意：一定要以tuple给如，如果只有一个参数就(xx,)）
+# def perform(inc):
+#     s.enter(inc,0,perform,(inc,))
+#     print ("Current Time:",time.time())
+#     
+# def mymain(inc):
+#     s.enter(inc,0,perform,(inc,))
+#     s.run()
 
-def insertSortInsert(container, element, func):
-    for index, item in enumerate(container):
-        if func(element, item):
-            container.insert(index, element)
-            break
-    else:
-        print('daw')
-        container.append(element)
+class a:
+    def __init__(self):
+        print('2')
+        self.l = []
 
 if __name__ == '__main__':
-#     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     sock.connect(('127.0.0.1', 9999))
-#     print('connect')
-#       
-#     while True:
-#         line = input('> ')
-#         sock.send(('%s\r\n' % line).encode())
-#         print(sock.recv(10240))
-#           
-#     sock.close()
+#     a = a()
+#     b = copy.deepcopy(a)
+#     print(a, a.l, b, b.l)
+#     mymain(2)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(('127.0.0.1', 9999))
+    print('connect')
+           
+    while True:
+        line = input('> ')
+        sock.send(('%s\r\n' % line).encode())
+        print(sock.recv(10240))
+               
+    sock.close()
 
-    c = [7,6,1]
-    insertSortInsert(c, 10, lambda x,y:x>=y)
-    insertSortInsert(c, 8, lambda x,y:x>=y)
-    insertSortInsert(c, 0, lambda x,y:x>=y)
-    insertSortInsert(c, 11, lambda x,y:x>=y)
-    insertSortInsert(c, -1, lambda x,y:x>=y)
-    print(c)
+#     c = [7,6,1]
+#     insertSortInsert(c, 10, lambda x,y:x>=y)
+#     insertSortInsert(c, 8, lambda x,y:x>=y)
+#     insertSortInsert(c, 0, lambda x,y:x>=y)
+#     insertSortInsert(c, 11, lambda x,y:x>=y)
+#     insertSortInsert(c, -1, lambda x,y:x>=y)
+#     print(c)
 
 #     file = open('articles//pages//test.txt', 'w')
 #     file.close()
@@ -52,10 +65,10 @@ if __name__ == '__main__':
 #     contentTree = BeautifulSoup(page, 'lxml')
 #     page += '''<link rel="stylesheet" href="%s">''' % 'bootstrap/css/bootstrap.min.css'
 #     print(page)
-    
-#     os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
-# #     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-#     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
+     
+    os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+#     DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
+    DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
 # # #     SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime, \
 # # #         mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
 # # #         VALUES(foragOwner.MID_SEQ.NEXTVAL,'%s','%s','%s','%s','%s','%s','%s',to_date('%s','yyyy-mm-dd hh24:mi:ss'),sysdate,0,0,0,0)
@@ -69,7 +82,7 @@ if __name__ == '__main__':
 #     cursor = connection.cursor()
 #     print('get cursor')
 #     print(cursor.execute("select msource from foragOwner.msgtable where rownum<=1"))
-#     print(cursor.fetchone())
+#     print(cursor.fetchall())
 #     SQL_ADD_NEW_ITEM = "INSERT INTO foragOwner.SimilarUrl(sourceUrl,similarUrl) VALUES('中dcdaw文','中文')"
 #     print(SQL_ADD_NEW_ITEM)
 #     cursor.execute(SQL_ADD_NEW_ITEM)
