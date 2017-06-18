@@ -89,6 +89,5 @@ $RECYCLE.BIN/
 *.lnk
 *.db
 froag/froag/spiders/data1/items.xml
-*.txt
 froag/froag/spiders/data1/20170224022730835.jpg
 froag/froag/spiders/data1/urlRelations.json
