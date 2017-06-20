@@ -1,5 +1,5 @@
 #encoding=utf-8
-import cx_Oracle, os, re, json, copy, random, socket, time, sched, copy, datetime
+import cx_Oracle, os, re, json, copy, random, socket, time, sched, copy, datetime, functools
 import urllib.request as ur
 from bs4 import BeautifulSoup, Tag
 
@@ -32,13 +32,27 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(('127.0.0.1', 9999))
     print('connect')
-               
+                   
     while True:
         line = input('> ')
         sock.send(('%s\r\n' % line).encode())
         print(sock.recv(10240))
-                   
+                       
     sock.close()
+
+#     l = [[1,1],[2,2],[1,3],[4,5]]
+#     print(list({i[0]:i for i in l}.values()))
+#     d = {1:1,2:2,3:3,4:4}
+#     for key,value in d.items():
+#         print(key, value)
+#     print(functools.reduce(lambda x,y:float(x)+float(y), [1.1,1.2,1.3,1.4,1.5,1.6]))
+#     l = [1,2,3,4,5,6,7]
+#     print(random.shuffle(l))
+#     print(l)
+#     d = {1:1, 2:2, 3:3}
+#     print(list(filter(lambda x:x[0] not in d, [[2],[4],[3]])))
+#     d = {1:1, 2:1, 3:2, 5:3}
+#     print(random.randint(1.2, 1.3))
 #     d = {1:1,2:2}
 #     for item, (key, value) in enumerate(d.items()):
 #         print(item,key, value)
