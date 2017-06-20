@@ -23,7 +23,7 @@ SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,
 '''
 SQL_UPDATE_SEQ_MID = "update foragOwner.SeqTable set value=foragOwner.MID_SEQ.CURRVAL where name='foragOwner.MID_SEQ'"
 SQL_GET_SEQ_MID = "select value from foragOwner.SeqTable where name='foragOwner.MID_SEQ'"
-SQL_ORACLE_ADD_TAG_MSG = 'insert into foragOwner.TagMsg Values(:1,:2)'
+SQL_ORACLE_ADD_TAG_MSG = 'insert into foragOwner.TagMsg Values(:1,:2, 0)'
 SQL_ORACLE_ADD_CHANNEL_MSG = 'insert into foragOwner.ChannelMsg Values(:1,:2)'
 SQL_ORACLE_UPDATE_TAG_MSG = 'update foragOwner.TagMsg set tMsg=:1 where tName=:2'
 SQL_ORACLE_UPDATE_CHANNEL_MSG = 'update foragOwner.ChannelMsg set cMsg=:1 where cName=:2'

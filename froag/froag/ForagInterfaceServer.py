@@ -1,7 +1,7 @@
 #encoding=utf8
 
-import socketserver, json, threading, sched, time
-import os, sqlite3, codecs, re, traceback, cx_Oracle
+import socketserver, json, threading
+import os, sqlite3, codecs, re, cx_Oracle
 import PageGenerator, PageRecommand
 
 FILE_DICT_DBNAME = 'pageDict.db'
@@ -18,9 +18,9 @@ def createDB(name, sql):
     db.close()
     
 def getValidOffset(offset, number, maxSize):
-    begin = int(offset)
-    end = begin + int(number)
-    begin = 0 if begin > maxSize else begin
+    begin, number = int(offset), int(number)
+    if begin > maxSize or number <= 0: return (0, 0)
+    end = begin + number
     end = maxSize if end > maxSize else end
     return (begin, end)
 
@@ -43,9 +43,11 @@ class GetUserInterestPageService:
         return result
     
     def service(self, params, response):
-        msgIds = self.generator.generate(params['params'])
+        params = json.loads(codecs.open(r'config/requestSample.json', 'r', 'utf-8').read())
+        msgIds = self.generator.generate(params['params'], self.conn)
         response['result'] = self._getMsgs(msgIds)
         response['state'] = 'success'
+        self.conn.close()
         print(response['result'])
 
 #{"name":"getHotTag","params":{"len":"10","offset":"0"}}
@@ -58,9 +60,6 @@ class GetHotTagService:
     
     def __init__(self):
         self.hotTag = []
-        
-        self.timer = sched.scheduler(time.time,time.sleep)
-        
         self._updateHotTag()
         
     def _updateHotTag(self):
@@ -78,7 +77,7 @@ class GetHotTagService:
     
     def service(self, params, response):
         offset = getValidOffset(params['params']['offset'], params['params']['len'], self.tagListSize)
-        response['result'] = self.hotTag[offset[0]:offset[1]]
+        response['result'] = [] if offset == (0,0) else self.hotTag[offset[0]:offset[1]]
         response['state'] = 'success'
         print(response['result'])
 
@@ -108,22 +107,27 @@ class GetTagArticleService:
     
     def service(self, params, response):
         params = params['params']
+        
         msgIds = self._getChannelMsg(params['name']) if params['type']=='channel' else self._getTagMsg(params['name'])
         if msgIds: 
             msgIds = tuple(map(lambda x:int(x[0]), json.loads(str(msgIds[0]))))
-            offset = getValidOffset(int(params['offset']), int(params['len']), len(msgIds))
-            msgIds = msgIds[offset[0]:offset[1]]
-            msgIds = str(msgIds) if len(msgIds) > 1 else '(%d)' % msgIds[0]
-            
-            msgs = self.cursor.execute(self.SQL_GET_MSG + msgIds).fetchall()
-            for index,msg in enumerate(msgs):
-                msgs[index] = [str(v) for v in msg]
-            
-            response['result'] = msgs
+            offset = getValidOffset(params['offset'], params['len'], len(msgIds))
+            if offset != (0,0):
+                msgIds = msgIds[offset[0]:offset[1]]
+                msgIds = str(msgIds) if len(msgIds) > 1 else '(%d)' % msgIds[0]
+                
+                msgs = self.cursor.execute(self.SQL_GET_MSG + msgIds).fetchall()
+                for index,msg in enumerate(msgs):
+                    msgs[index] = [str(v) for v in msg]
+                
+                response['result'] = msgs
+            else:
+                response['result'] = '[]'
         else:
             response['result'] = '[]'
         
         response['state'] = 'success'
+        self.conn.close()
         print(response['result'])
         
 # {"name":"getHotArticle","params":{"len":"10", "userid":"123", "offset":"0"}}
@@ -183,7 +187,7 @@ class GetHotArticleService:
     
     def service(self, params, response):
         offset = self._getUserRequestOffset(params['params']['userid'], params['params']['offset'], params['params']['len'])
-        response['result'] = self.hotMsg[offset[0]:offset[1]]
+        response['result'] = [] if offset == (0,0) else self.hotMsg[offset[0]:offset[1]]
         response['state'] = 'success'
         print(response['result'])
 
@@ -216,6 +220,8 @@ class GeneratePageService:
         template = self.__getTemplate(params['params']['template'])
         response['result'] = self.generator.getPage(params['params']['pageid'], template)
         response['state'] = "success"
+        self.orConn.close()
+        self.slConn.close()
         print(response['result'])
 
 # {"name":"uploadPageTemplate","params":{"name":"模板一","file":"文件数据"}}

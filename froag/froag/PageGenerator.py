@@ -145,7 +145,7 @@ class PageGenerator:
     
     def __templateStyleApply(self, paramsDict, templateStyle):
         page = ''
-        for sectionKey, sectionValue in templateStyle['layout'].items():
+        for (sectionKey, sectionValue) in templateStyle['layout']:
             for paramKey in paramsDict.keys():
                 if paramKey.find(sectionKey) != -1:
                     page = page + sectionValue

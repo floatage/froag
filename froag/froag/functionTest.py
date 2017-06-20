@@ -1,5 +1,5 @@
 #encoding=utf-8
-import cx_Oracle, os, re, json, copy, random, socket, time, sched, copy
+import cx_Oracle, os, re, json, copy, random, socket, time, sched, copy, datetime
 import urllib.request as ur
 from bs4 import BeautifulSoup, Tag
 
@@ -32,13 +32,24 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(('127.0.0.1', 9999))
     print('connect')
-           
+               
     while True:
         line = input('> ')
         sock.send(('%s\r\n' % line).encode())
         print(sock.recv(10240))
-               
+                   
     sock.close()
+#     d = {1:1,2:2}
+#     for item, (key, value) in enumerate(d.items()):
+#         print(item,key, value)
+#     d = {1:1,2:2,3:3}
+#     print(d[1:2])
+#     dateFormat = '%Y-%m-%d %H:%M:%S'
+#     interval = datetime.datetime.strptime('2017-06-19 21:47:47', dateFormat) - datetime.datetime.strptime('2017-06-18 22:38:47', dateFormat)
+#     print(interval.seconds)
+
+#     now = datetime.datetime.now()
+#     print(now.strftime('%m-%d'))
 
 #     c = [7,6,1]
 #     insertSortInsert(c, 10, lambda x,y:x>=y)
