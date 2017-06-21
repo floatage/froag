@@ -1,13 +1,13 @@
 #encoding=utf8
 
-import json, datetime, codecs, math, random, functools
+import json, datetime, codecs, math, random, functools, copy
 import ForagInterfaceService
 
 dateDict = json.loads(codecs.open('config/date.json','r', 'utf-8').read(), 'utf-8')
 
 # 浏览、赞、踩、评论、收藏、转发，对应操作分数1,2,-2,3,4,5
 class UserProfileGenerator:
-    opGradeDict = {'browse':1.0, 'like':2.0, 'dislike':-2.0, 'comment':3.0, 'collect':4.0, 'transmit':5.0}
+    opGradeDict = {'browse':3.0, 'like':3.5, 'dislike':-3.5, 'comment':4.0, 'collect':4.5, 'transmit':5.0}
     dateFormat = '%Y-%m-%d %H:%M:%S'
     dateWeight = 0.9
     defaultGrade = 10.0
@@ -87,6 +87,7 @@ class UserMsgMatcher_BaseFeature:
     channelRate = 1.0 - tagRate
     tagMaxNumbe = 10
     posReduceRate = 0.85
+    chooseMaxSize = 2
     
     def _chooseMsgIds(self, keyResult, mLen, keySet, keyAllWeight, stopSet):
         result = []
@@ -107,16 +108,22 @@ class UserMsgMatcher_BaseFeature:
         return result
     
     def _getKeysMsgIds(self, keySet, keyAllWeight, mLen, stopSet, sql, conn):
-        queryKeys = keySet.keys()
-        queryKeys = str(tuple(queryKeys)) if len(queryKeys) > 1 else '(%d)' % queryKeys[0]
+        queryKeys = list(keySet.keys())
+        if len(queryKeys) > 1:
+            queryKeys = str(tuple(queryKeys))
+        else :
+            if isinstance(queryKeys[0], str):
+                queryKeys = "('%s')" % queryKeys[0]
+            else:
+                queryKeys = "(%d)" % queryKeys[0]
         keyResult = conn.cursor().execute(sql + queryKeys).fetchall()
         
         result = []
         if keyResult:
-            result = self._chooseMsgIds(keyResult, mLen, keySet, keyAllWeight, stopSet)
-            if (len(result) < mLen):
-                stopSet.extend(result)
+            for counter in range(0, self.chooseMaxSize):
+                if len(result) >= mLen: break
                 result.extend(self._chooseMsgIds(keyResult, mLen, keySet, keyAllWeight, stopSet))
+                stopSet.extend(result)
             
             result = list(set(result))
             result = [int(i) for i in result]
@@ -145,16 +152,16 @@ class UserMsgMatcher_BaseFeature:
     def generate(self, params, interest, conn):
         optionalTags = interest['optional']
         for tag, weight in interest['tag'].items():
-            optionalTags[tag] = weight * self.interestOptionalRate
+            optionalTags[tag] = float(weight) * self.interestOptionalRate
         
-        requestMsgSize, history = int(params['len']), params['log']['history']
+        requestMsgSize, history = int(params['len']), copy.deepcopy(params['log']['history'])
         result = self._getInterestTagMsg(optionalTags, int(requestMsgSize*self.tagRate), history, conn)
         result.extend(self._getInterestChannelMsg(interest['channel'], int(requestMsgSize*self.channelRate), history, conn))
         return 'id', result
 
 class UserMsgMatcher_BaseCollaboration:
     historyLenRange = (5,10)
-    resultRateRange = (0.1, 0.3)
+    resultRateRange = (0.1, 0.2)
     
     SQL_GET_SIMILAR_URL = 'select similarurl from foragOwner.similarurl where sourceurl in '
     
@@ -164,7 +171,7 @@ class UserMsgMatcher_BaseCollaboration:
             return 'url', []
         
         resultUrls = random.sample(params['log']['historyUrl'], resultUrlsLen)
-        resultUrls = str(tuple(resultUrls)) if len(resultUrls) > 1 else '(%d)' % resultUrls[0]
+        resultUrls = str(tuple(resultUrls)) if len(resultUrls) > 1 else "('%s')" % resultUrls[0]
         similarUrls = conn.cursor().execute(self.SQL_GET_SIMILAR_URL + resultUrls).fetchall()
         similarUrls = [v[0] for v in similarUrls]
         similarUrlsLenRange = [int(int(params['len'])*r) for r in self.resultRateRange]
@@ -187,7 +194,7 @@ class ResultSetGenerator:
     SQL_GET_MSG_URL = 'select mId, mTitle, mIntro, mPic, mTags, mAuthor, \
         mPublishTime, mLikeCount, mDislikeCount, mCollectCount, mTransmitCount from foragOwner.MsgTable where mSource in '
     
-    addtionMsgRange = (0.1, 0.2)
+    addtionMsgRange = (0.1, 0.12)
     
     def _getAddtionResultSet(self, mLen):
         service = ForagInterfaceService.serviceManager.getServiceObj('getHotArticle')
@@ -223,6 +230,7 @@ class ResultSetGenerator:
         resultSet.extend(self._getMsgs(optionalResultSet['id'][0:max(0,oddLen)], conn, 'id'))
         print('generate id msg len: %d' % len(resultSet))
         resultSet = self._resultSetFilter(params, resultSet)
+        print('recommand len: %d' % len(resultSet))
         return {'msg':resultSet, 'id':[m[0] for m in resultSet]}
     
 class InterestArticleGenerator:
