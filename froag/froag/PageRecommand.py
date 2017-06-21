@@ -23,6 +23,7 @@ class UserProfileGenerator:
         self.todayDate = datetime.datetime.now()
         self.interest = params['user']['utInterest']
         self.optionalTags = self.interest['optional']
+        self.recommandHistory = list(set(self.params['history']))
     
     def _getContextTags(self, context):
         specialDay = self.todayDate.strftime('%m-%d')
@@ -56,7 +57,9 @@ class UserProfileGenerator:
             self.interest['channel'][msgTags['type']] = float(self.interest['channel'].setdefault(msgTags['type'], 0.0)) + msgGrade
         
         log['historyUrl'] = list(set(historyUrls))
-        log['history'] = list(set(log['history']))
+        stopSet = list(set(log['history']))
+        stopSet.extend(self.recommandHistory)
+        log['history'] = stopSet
         
     def _recordProfile(self, interest, cursor, userId):
         record = {}
@@ -220,7 +223,7 @@ class ResultSetGenerator:
         resultSet.extend(self._getMsgs(optionalResultSet['id'][0:max(0,oddLen)], conn, 'id'))
         print('generate id msg len: %d' % len(resultSet))
         resultSet = self._resultSetFilter(params, resultSet)
-        return resultSet
+        return {'msg':resultSet, 'id':[m[0] for m in resultSet]}
     
 class InterestArticleGenerator:
     def generate(self, params, conn):

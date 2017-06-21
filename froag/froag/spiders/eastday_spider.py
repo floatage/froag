@@ -57,6 +57,7 @@ class HuanqiuSpider(Spider):
     
     item_content_delete_tag = ['div', 'script']
     item_content_tag_class = '.text'
+    item_content_unfeature_tag = []
     
     url_relations = []
     similar_news_urls = []
@@ -150,7 +151,86 @@ class HuanqiuSpider(Spider):
     def close(self):
 #         self.storeUrls()
         self.storeItemExtraInfor()
-
+        
+    
+class CSDNSpider(Spider):
+    name = 'csdn'
+    default_author_name = 'csdn'
+    allowed_domains = []
+    start_urls = [
+        'http://blog.csdn.net/'
+#         'http://blog.csdn.net/u012468376/article/details/55001497'
+    ]
+    
+    url_pattern_article = 'http://blog\.csdn\.net/.*/article/details/.*'
+#     http://blog.csdn.net/guolin_blog/article/details/70215985
+#     http://blog.csdn.net/u012468376/article/category/6083852
+#     http://blog.csdn.net/enterprise/newarticle.html
+#     http://blog.csdn.net/column/details/objective-c-primary.html
+#     http://blog.csdn.net/VNanyesheshou
+    url_pattern_sub = 'http://blog\.csdn\.net/.*'
+    sub_website = set()
+    
+    item_content_delete_tag = ['script']
+    item_content_tag_class = '.article_content'
+    
+    item_counter = 0
+    item_store_number = 400
+    item_store_counter = 0
+    
+    request_url_recent = set()
+    
+    FILTER_SUBWEBSITE = True
+    STORE_SIMILARURLS = True
+    
+    defaul_tag_weight = 10.0
+    max_tag_number = 5
+    
+    def _getItemTags(self, tags, classfy):
+        tags = tags.split(' ')
+        tags.extend(classfy.split(' '))
+        result = {"type": self.default_author_name, "tag":{}}
+        
+        for tag in tags:
+            if tag != '':
+                tag = tag.capitalize()
+                result['tag'][tag] = result['tag'].setdefault(tag, 0.0) + self.defaul_tag_weight  
+        
+        if len(result['tag']) != 0:
+            tags = sorted(result['tag'].items(), key=lambda x:x[1], reverse=True)
+            tags = tags[0:min(len(result['tag']), self.max_tag_number)]
+            result['tag'] = {x[0]:x[1] for x in tags}
+        return json.dumps(result, ensure_ascii=False)
+    
+    def parse(self, response):
+        item = NewsItem()
+        item['mauthor'] = ''
+        item['msource'] = response.url
+        tags = responseStrGenerator(response, '.link_categories a::text')
+        classfy = responseStrGenerator(response, '.category_r label span::text')
+        item['mtags'] = self._getItemTags(tags, classfy)
+        item['mtitle'] = responseStrGenerator(response, '.link_title a::text')
+        item['mtime'] = responseStrGenerator(response, '.article_r .link_postdate::text')
+        item['mcontent'] = responseStrGenerator(response, '.article_content')
+        item['mintro'] = responseStrGenerator(response, '.article_content p:first-of-type::text')
+        item['mpic'] = responseStrGenerator(response, '.article_content img:first-of-type::attr(src)', getPart=True)   
+        yield item
+        
+        self.item_counter = self.item_counter + 1  
+        if self.item_counter % self.item_store_number == 0:
+            self.request_url_recent.clear()
+        
+        next_pages = response.css('a::attr("href")').extract()
+        for next_page in next_pages:
+            next_page = response.urljoin(next_page)
+            
+            if re.match(self.url_pattern_article, next_page) and next_page not in self.request_url_recent:
+                self.request_url_recent.add(next_page)
+                yield Request(next_page, callback=self.parse)
+            elif self.FILTER_SUBWEBSITE and re.match(self.url_pattern_sub, next_page) and next_page not in self.sub_website:
+                self.sub_website.add(next_page)
+                yield Request(next_page, callback=self.parse)
+    
 class EastdaySpider(Spider):
     name = 'eastday'
     default_author_name = '东方头条'

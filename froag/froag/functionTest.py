@@ -29,17 +29,21 @@ if __name__ == '__main__':
 #     b = copy.deepcopy(a)
 #     print(a, a.l, b, b.l)
 #     mymain(2)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('127.0.0.1', 9999))
-    print('connect')
-                   
-    while True:
-        line = input('> ')
-        sock.send(('%s\r\n' % line).encode())
-        print(sock.recv(10240))
-                       
-    sock.close()
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     sock.connect(('127.0.0.1', 9999))
+#     print('connect')
+#                    
+#     while True:
+#         line = input('> ')
+#         sock.send(('%s\r\n' % line).encode())
+#         print(sock.recv(10240))
+#                        
+#     sock.close()
+    d = {1:3,2:1,3:4,4:2}
+    print(sorted(d.items(), key=lambda x:x[1], reverse=True))
 
+#     s = 'jAva'
+#     print(s.capitalize())
 #     l = [[1,1],[2,2],[1,3],[4,5]]
 #     print(list({i[0]:i for i in l}.values()))
 #     d = {1:1,2:2,3:3,4:4}

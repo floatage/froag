@@ -42,7 +42,10 @@ class EmptyItemDropPipeline(object):
             elif spider.name == 'huanqiu':
                 item['mtime'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) if item['mtime'] == '' else item['mtime']
                 item['mauthor'] = spider.default_author_name if item['mauthor'] == '' else item['mauthor']
-            
+            elif spider.name == 'csdn':
+                item['mtime'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) if item['mtime'] == '' else item['mtime']+':00'
+                item['mauthor'] = spider.default_author_name if item['mauthor'] == '' else item['mauthor']
+                
             item['mintro'] = item['mintro'][0:(min(200, len(item['mintro'])))]
             item['mtitle'] = item['mtitle'][0:(min(100, len(item['mtitle'])))]
             return item

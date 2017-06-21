@@ -1,6 +1,6 @@
 #encoding=utf8
 
-import socketserver, json, threading
+import socketserver, json, threading, traceback
 import ForagInterfaceService
 
 class ForagInterfaceHandler(socketserver.StreamRequestHandler):
@@ -9,20 +9,21 @@ class ForagInterfaceHandler(socketserver.StreamRequestHandler):
         
         response = {}
         
-        data = self.rfile.readline().decode()
-        print('recv:%s' % data)
-        requestParams = json.loads(data)
-        ForagInterfaceService.serviceManager.getServiceObj(requestParams['name']).service(requestParams, response)
-        print(len(response['result']), response['result'])
-#         try:
-#             data = self.rfile.readline().decode()
-#             print('recv:%s' % data)
-#             requestParams = json.loads(data)
-#             print(requestParams)
-#             self.serviceDict[requestParams['name']].service(requestParams, response)
-#         except Exception:
-#             response['state'] = 'failed'
-#             response['reason'] = traceback.format_exc()
+#         data = self.rfile.readline().decode()
+#         print('recv:%s' % data)
+#         requestParams = json.loads(data)
+#         ForagInterfaceService.serviceManager.getServiceObj(requestParams['name']).service(requestParams, response)
+#         print(len(response['result']), response['result'])
+        try:
+            data = self.rfile.readline().decode()
+            print('recv:%s' % data)
+            requestParams = json.loads(data)
+            ForagInterfaceService.serviceManager.getServiceObj(requestParams['name']).service(requestParams, response)
+            print('success: len:', len(response['result']), response['result'])
+        except Exception:
+            response['state'] = 'failed'
+            response['reason'] = traceback.format_exc()
+            print('failed:', response['reason'])
          
         self.wfile.write(json.dumps(response, ensure_ascii=False).encode())
    

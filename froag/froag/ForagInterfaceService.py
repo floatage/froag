@@ -47,6 +47,7 @@ class GetHotTagService:
         self._updateHotTag()
         
     def _updateHotTag(self):
+        self.hotTag.clear()
         conn = cx_Oracle.connect(DB_CONNECT_STRING_ORACLE)
         try:
             cursor = conn.cursor()
@@ -60,7 +61,7 @@ class GetHotTagService:
         self.timer.start()
     
     def service(self, params, response):
-        offset = getValidOffset(params['params']['offset'], params['params']['len'], self.tagListSize)
+        offset = getValidOffset(params['params']['offset'], params['params']['len'], len(self.hotTag))
         response['result'] = [] if offset == (0,0) else self.hotTag[offset[0]:offset[1]]
         response['state'] = 'success'
 
@@ -134,7 +135,6 @@ class GetHotArticleService:
         try:
             cursor = conn.cursor()
             result = cursor.execute(sql, params).fetchall()
-            self.hotMsg.clear()
             for row in result:
                 value = [str(col) if col!=None else 'None' for col in row]
                 self.hotMsg.append(value)
@@ -145,15 +145,16 @@ class GetHotArticleService:
         self._getMsgToList(self.SQL_GET_NEWEST_MSG, (self.msgListSize,))
             
     def _getPopularestMsg(self):
+        self.hotMsg.clear()
         listFreeSize = self.msgListSize
         conn = sqlite3.connect(FILE_DICT_DBNAME)
         try:
             cursor = conn.cursor()
             pageIds = cursor.execute(self.SQL_GET_POPULAREST_MSG_ID, (self.msgListSize,)).fetchall()
             if pageIds:
-                listFreeSize -= len(pageIds)
-                pageIds = pageIds[0]
-                pageIds = str(pageIds) if len(pageIds) > 1 else '(%d)' % pageIds[0]
+                listFreeSize = listFreeSize - len(pageIds)
+                pageIds = [p[0] for p in pageIds]
+                pageIds = str(tuple(pageIds)) if len(pageIds) > 1 else '(%d)' % pageIds[0]
                 self._getMsgToList(self.SQL_GET_POPULAREST_MSG + pageIds, ())
         finally:
             conn.close()
@@ -165,7 +166,7 @@ class GetHotArticleService:
         self.timer.start()
         
     def _getUserRequestOffset(self, userid, offset, number):
-        return getValidOffset(int(offset), int(number), self.msgListSize)
+        return getValidOffset(int(offset), int(number), len(self.hotMsg))
     
     def service(self, params, response):
         offset = self._getUserRequestOffset(params['params']['userid'], params['params']['offset'], params['params']['len'])
