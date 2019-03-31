@@ -5,8 +5,8 @@ import PageGenerator, PageRecommand
 
 FILE_DICT_DBNAME = 'pageDict.db'
 # DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-# DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.43.16/orcl'
-DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
+DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.43.16/orcl'
+# DB_CONNECT_STRING_ORACLE = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
 os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
 
 def createDB(name, sql):

@@ -15,7 +15,8 @@ TAG_STORE = True
 TAG_MSG_STORE = True
 tag_relation_tmp = []
 # DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@10.18.50.229/orcl'
-DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
+# DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@192.168.1.181/orcl'
+DB_CONNECT_STRING = 'foragCollecter_1/foragCollecter@192.168.43.16/orcl'
 SQL_ORACLE_ADD_TAG = "INSERT INTO foragOwner.TagTable(sourceTag,parentTag,sourceId) VALUES(:1,:2,foragOwner.MID_SEQ.CURRVAL)"
 SQL_ADD_NEW_ITEM = '''INSERT INTO foragOwner.MsgTable(mId,mSource,mTitle,mIntro,mPic,mTags,mAuthor,mContent,mPublishTime, \
         mCollectTime,mLikeCount,mDislikeCount,mCollectCount,mTransmitCount) \
